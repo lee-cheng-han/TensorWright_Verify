@@ -59,7 +59,13 @@ def _align(value: int) -> int:
 def _tensor_bytes(tensor: Tensor) -> bytes:
     if tensor.constant_data is None:
         return b""
-    dtype = {"int8": "<i1", "int32": "<i4", "float32": "<f4"}.get(tensor.compiled_dtype)
+    dtype = {
+        "int8": "<i1",
+        "int32": "<i4",
+        "float": "<f4",
+        "float32": "<f4",
+        "float64": "<f8",
+    }.get(tensor.compiled_dtype)
     if dtype is None:
         raise BundleValidationError(
             f'Cannot pack tensor "{tensor.name}" with dtype {tensor.compiled_dtype}'

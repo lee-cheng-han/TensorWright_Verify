@@ -70,3 +70,18 @@ contents. Tests unpack command fields, inspect tensor and quantization sizes, lo
 validated metadata, and reject checksum corruption, incompatible versions, and invalid
 bundle paths. The validator also enforces required files, command-record boundaries,
 64-byte memory alignment, JSON schemas, and matching graph/schedule layer counts.
+
+Milestone 10 executes bundles solely from decoded commands and schedules, cross-checks
+packed weights and biases, allocates bounded simulated memory, records public register
+transactions, and verifies final bytes against the packaged reference. Tests cover a
+mixed FPGA/ARM/metadata graph, deterministic no-stall counters, reproducible seeded
+backpressure, timeout failures containing their seed, and CLI success/failure behavior.
+These are contract-model counters; simulator-derived trace measurements begin in the
+revised Milestone 12.
+
+The revised verification plan adds canonical trace schema and round-trip tests,
+reference and RTL trace capture, semantic alignment, first-divergence localization,
+deterministic diagnosis-rule fixtures, explicit fault injection, minimizer preservation
+tests, and generated regression portability. Milestone 11 implements only schema
+validation, Python-reference trace generation, and CLI inspection. Later capabilities
+must not be inferred from the presence of schema fields.

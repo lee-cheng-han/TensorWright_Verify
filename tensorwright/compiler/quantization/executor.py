@@ -25,13 +25,16 @@ def execute_float(
     return {name: values[name].copy() for name in names}
 
 
-def execute_quantized(graph: Graph, inputs: Mapping[str, np.ndarray]) -> ArrayMap:
+def execute_quantized(
+    graph: Graph, inputs: Mapping[str, np.ndarray], *, capture_all: bool = False
+) -> ArrayMap:
     """Execute a quantized graph with integer Conv/Gemm and explicit ARM fallbacks."""
     values = _initial_values(graph, inputs, quantized=True)
     for operation in graph.operations:
         operation_inputs = [values[name] for name in operation.inputs]
         values.update(_execute_quantized_operation(graph, operation, operation_inputs))
-    return {name: values[name].copy() for name in graph.outputs}
+    names = values.keys() if capture_all else graph.outputs
+    return {name: values[name].copy() for name in names}
 
 
 def _initial_values(

@@ -33,3 +33,8 @@ strides, and per-output-channel bias, multiplier, and shift values.
 Milestone 4 calibration and graph quantization are specified in
 `quantized_compilation.md`. Calibration is data-dependent: reported ranges, errors, and
 accuracy values always come from the samples supplied to that compilation run.
+
+These numerical rules are also the golden evidence source for TensorWright Verify.
+Future deterministic diagnosis will distinguish signedness, saturation, rounding,
+arithmetic-shift, scale, and bias-placement failures against this specification.
+Milestone 11 records scales and zero points but does not classify causes.

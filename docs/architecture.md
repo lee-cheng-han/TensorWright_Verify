@@ -1,47 +1,33 @@
-# Architecture
+# TensorWright Verify architecture
 
-TensorWright's first complete version is an explicitly staged, board-independent stack:
-
-```text
-ONNX model -> compiler IR -> optimization and INT8 quantization
-           -> memory plan and schedule -> .twmodel bundle
-           -> simulation runtime -> AXI transaction model
-           -> SystemVerilog accelerator simulation
-           -> verification results and simulated counters
-```
-
-The compiler owns graph validation, numerical lowering, backend partitioning, memory
-planning, and command generation. The simulation runtime will validate bundle and
-hardware-interface versions, allocate simulated memory, program the documented register
-model, drive AXI-style streams, invoke RTL layers, and execute CPU fallbacks. The
-reusable SystemVerilog accelerator performs configured layers rather than embedding a
-particular network.
-
-The future board path replaces only the runtime transport:
+TensorWright Verify answers why quantized software and accelerator execution disagree:
 
 ```text
-First release: simulation runtime -> cocotb/RTL simulator
-Future board:  ARM runtime -> AXI DMA -> FPGA accelerator
+ONNX or QONNX model
+        |
+        +-> quantized Python reference -> canonical reference trace --+
+        |                                                       future |
+        +-> custom RTL -> Cocotb simulation -> hardware trace --------+-> alignment
+                                                                         -> first divergence
+                                                                         -> diagnosis
+                                                                         -> minimization
+                                                                         -> regression
 ```
 
-The compiler IR, `.twmodel` schema, command encoding, tensor layouts, register map,
-stream ordering, error behavior, and RTL ports must be shared by both paths. Simulation
-adapters may not introduce model-specific commands or bypass those interfaces.
+Milestone 11 implements only the canonical trace contract and Python-reference writer.
+RTL trace capture begins in Milestone 12; alignment and debugging stages follow later.
 
-Correctness advances in this order: specification, bit-accurate software reference,
-compiler, RTL units, integrated RTL, and finally hardware. Performance work follows a
-correct end-to-end path. The current compiler validates and imports static ONNX graphs,
-then applies conservative, deterministic graph transformations. It does not yet emit a
-schedule, deployment bundle, or accelerator commands. The quantized software path
-executes Conv and Gemm with integer arithmetic, preserves integer data through MaxPool
-and View, and makes the ARM floating-point Softmax boundary explicit.
+## Preserved supporting infrastructure
 
-Bit-accurate RTL simulation verifies the digital design and protocol behavior without a
-board. Simulator cycle counts are observations of that simulation, but latency derived
-from an assumed clock is an estimate. Vivado synthesis and implementation for
-`xc7z020clg400-1` will provide tool-reported feasibility, utilization, and timing—not
-physical performance or power.
+The ONNX frontend and compiler IR provide stable operations, graph connectivity, tensor
+shapes/layouts, fused groups, and quantization metadata. The integer backend supplies
+golden values. `.twmodel` retains graphs, packed constants, schedules, reference vectors,
+and interface versions. The runtime provides register/stream orchestration, seeded
+backpressure, timeouts, CPU fallbacks, and a future insertion point for hardware events.
+The custom SystemVerilog accelerator remains the primary integration and controlled
+fault-injection target.
 
-The eventual hardware target remains the Digilent Zybo Z7-20 (Zynq-7020). Future board
-integration uses AXI4-Lite for control, AXI Stream for payloads, and AXI DMA where
-appropriate. See `future_board_port.md` for the replacement boundary.
+Compilation is now a lower-level workload and metadata preparation mechanism, not the
+primary product. Existing bundle and `simulate` workflows remain compatible. No FINN or
+hls4ml adapter exists; future adapters must convert real tested traces into the same
+canonical schema.

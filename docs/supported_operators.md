@@ -31,3 +31,9 @@ visible unless every parameter is constant and its Conv producer is safe to rewr
 Operation-level validation such as convolution kernel and stride restrictions remains
 future work. Nodes in custom domains are rejected even when their short operation name
 matches the whitelist.
+
+Under TensorWright Verify, operator support has three separate meanings: the Python
+reference can produce semantic traces, the custom RTL can expose a corresponding stage,
+and the future alignment engine can compare them. Current M11 trace generation covers
+outputs executable by the quantized Python backend. This does not imply an RTL trace
+point or cross-backend alignment exists yet.
