@@ -12,6 +12,12 @@ from tensorwright.trace.diagnosis import (
     DiagnosisReport,
     diagnose_comparison,
 )
+from tensorwright.trace.protocol import (
+    PROTOCOL_RULESET_VERSION,
+    ProtocolFinding,
+    ProtocolReport,
+    analyze_protocol_files,
+)
 from tensorwright.trace.reference import write_reference_trace
 from tensorwright.trace.schema import (
     TRACE_VERSION,
@@ -32,12 +38,16 @@ __all__ = [
     "DiagnosisReport",
     "Divergence",
     "QuantizationMetadata",
+    "PROTOCOL_RULESET_VERSION",
+    "ProtocolFinding",
+    "ProtocolReport",
     "TraceError",
     "TraceEvent",
     "TraceSet",
     "read_trace",
     "compare_trace_files",
     "diagnose_comparison",
+    "analyze_protocol_files",
     "write_reference_trace",
     "write_trace",
 ]

@@ -82,6 +82,7 @@ revised Milestone 12.
 The revised verification plan adds canonical trace schema and round-trip tests,
 reference and RTL trace capture, semantic alignment, first-divergence localization,
 deterministic diagnosis-rule fixtures, explicit fault injection, minimizer preservation
-tests, and generated regression portability. Milestone 11 implements only schema
-validation, Python-reference trace generation, and CLI inspection. Later capabilities
-must not be inferred from the presence of schema fields.
+tests, and generated regression portability. Milestones 11–16 now cover schema validation,
+reference and RTL trace capture, comparison, numerical and protocol diagnosis, deterministic
+failure-preserving minimization, and portable Cocotb regression generation. Dashboard and later
+capabilities must not be inferred from the presence of schema fields.

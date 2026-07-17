@@ -3,17 +3,29 @@
 from __future__ import annotations
 
 import argparse
+import json
+import subprocess
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
+
 from tensorwright import __version__
 from tensorwright.compiler import CompilerError
+from tensorwright.minimizer import FailureSignature, MinimizationError, minimize_inputs
+from tensorwright.regression import (
+    RegressionGenerationError,
+    generate_cocotb_regression,
+)
 from tensorwright.runtime import SimulationConfig, SimulationError, simulate_bundle
 from tensorwright.trace import (
     ComparisonReport,
     DiagnosisReport,
+    ProtocolReport,
     TraceError,
+    analyze_protocol_files,
     compare_trace_files,
     diagnose_comparison,
     read_trace,
@@ -44,6 +56,28 @@ def build_parser() -> argparse.ArgumentParser:
     simulate.add_argument(
         "--no-backpressure", action="store_true", help="keep modeled stream ready high"
     )
+    minimize = subparsers.add_parser(
+        "minimize", help="reduce a failing NPZ input with an external failure oracle"
+    )
+    minimize.add_argument("input", help="input .npz containing named tensors")
+    minimize.add_argument("output", help="destination .npz for minimized tensors")
+    minimize.add_argument("--report", help="destination JSON report path")
+    minimize.add_argument("--max-evaluations", type=int, default=1000)
+    minimize.add_argument("--oracle-timeout", type=float, default=300.0)
+    minimize.add_argument(
+        "--oracle",
+        nargs=argparse.REMAINDER,
+        required=True,
+        help="oracle command; TensorWright appends the candidate .npz path",
+    )
+    generate = subparsers.add_parser(
+        "generate-regression", help="package a minimized failure as a Cocotb test"
+    )
+    generate.add_argument("inputs", help="minimized named-tensor .npz")
+    generate.add_argument("minimization_report", help="minimizer JSON report")
+    generate.add_argument("reference_trace", help="canonical minimized reference trace")
+    generate.add_argument("output", help="new or empty output directory")
+    generate.add_argument("--name", required=True, help="portable test identifier")
     trace = subparsers.add_parser("trace", help="inspect canonical verification traces")
     trace_commands = trace.add_subparsers(dest="trace_command", required=True)
     inspect = trace_commands.add_parser(
@@ -68,6 +102,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print the machine-readable diagnosis"
     )
     diagnose.add_argument("--report", help="also write the JSON report to this path")
+    protocol = trace_commands.add_parser(
+        "diagnose-protocol", help="analyze streaming and packetization behavior"
+    )
+    protocol.add_argument("reference", help="canonical software-reference trace")
+    protocol.add_argument("candidate", help="canonical RTL or HLS candidate trace")
+    protocol.add_argument(
+        "--json", action="store_true", help="print the machine-readable protocol report"
+    )
+    protocol.add_argument("--report", help="also write the JSON report to this path")
     return parser
 
 
@@ -89,6 +132,89 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print(result.to_json(), end="")
         return 0 if result.reference_match else 2
+    if arguments.command == "minimize":
+        try:
+            input_path = Path(arguments.input)
+            output_path = Path(arguments.output)
+            if input_path.suffix != ".npz" or output_path.suffix != ".npz":
+                raise MinimizationError("Minimizer input and output must use .npz")
+            if not arguments.oracle:
+                raise MinimizationError("An oracle command is required")
+            if arguments.oracle_timeout <= 0:
+                raise MinimizationError("Oracle timeout must be positive")
+            with np.load(input_path, allow_pickle=False) as archive:
+                inputs = {name: archive[name].copy() for name in archive.files}
+            with tempfile.TemporaryDirectory(
+                prefix="tensorwright-minimize-"
+            ) as directory:
+                candidate_path = Path(directory) / "candidate.npz"
+
+                def oracle(candidate: dict[str, np.ndarray]) -> FailureSignature | None:
+                    np.savez(candidate_path, **candidate)
+                    try:
+                        completed = subprocess.run(
+                            [*arguments.oracle, str(candidate_path)],
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            timeout=arguments.oracle_timeout,
+                        )
+                    except subprocess.TimeoutExpired as error:
+                        raise MinimizationError(
+                            f"Oracle exceeded {arguments.oracle_timeout:g} seconds"
+                        ) from error
+                    if completed.returncode != 0:
+                        detail = completed.stderr.strip() or "no stderr"
+                        raise MinimizationError(
+                            f"Oracle exited with {completed.returncode}: {detail}"
+                        )
+                    payload = json.loads(completed.stdout)
+                    if payload is None:
+                        return None
+                    if not isinstance(payload, dict):
+                        raise MinimizationError(
+                            "Oracle output must be a failure-signature object or null"
+                        )
+                    return FailureSignature.from_dict(payload)
+
+                result = minimize_inputs(
+                    inputs,
+                    oracle,
+                    max_evaluations=arguments.max_evaluations,
+                )
+            report_path = (
+                Path(arguments.report)
+                if arguments.report
+                else output_path.with_suffix(".report.json")
+            )
+            result.write(output_path, report_path)
+        except (
+            MinimizationError,
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as error:
+            print(f"tensorwright: minimization failed: {error}", file=sys.stderr)
+            return 1
+        print(result.report_json(), end="")
+        return 0
+    if arguments.command == "generate-regression":
+        try:
+            package = generate_cocotb_regression(
+                arguments.inputs,
+                arguments.minimization_report,
+                arguments.reference_trace,
+                arguments.output,
+                name=arguments.name,
+            )
+        except RegressionGenerationError as error:
+            print(
+                f"tensorwright: regression generation failed: {error}", file=sys.stderr
+            )
+            return 1
+        print(f"Generated Cocotb regression: {package.path}")
+        print(f"Test module: {package.test_path.name}")
+        return 0
     if arguments.command == "trace" and arguments.trace_command == "inspect":
         try:
             trace_set = read_trace(arguments.path)
@@ -142,6 +268,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_diagnosis(diagnosis)
         return 0 if diagnosis.matched else 2
+    if arguments.command == "trace" and arguments.trace_command == "diagnose-protocol":
+        try:
+            protocol_report = analyze_protocol_files(
+                arguments.reference, arguments.candidate
+            )
+            if arguments.report:
+                report_path = Path(arguments.report)
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(protocol_report.to_json(), encoding="utf-8")
+        except (TraceError, OSError, ValueError) as error:
+            print(f"tensorwright: protocol diagnosis failed: {error}", file=sys.stderr)
+            return 1
+        if arguments.json:
+            print(protocol_report.to_json(), end="")
+        else:
+            _print_protocol_report(protocol_report)
+        return 0 if protocol_report.protocol_ok else 2
     return 0
 
 
@@ -189,3 +332,24 @@ def _print_diagnosis(report: DiagnosisReport) -> None:
     print("Recommended checks:")
     for item in diagnosis.recommended_checks:
         print(f"  - {item}")
+
+
+def _print_protocol_report(report: ProtocolReport) -> None:
+    print("TensorWright Verify protocol diagnosis")
+    print(f"Ruleset version: {report.ruleset_version}")
+    print(f"Candidate backend: {report.candidate_backend}")
+    print(f"Stream events: {report.stream_events}")
+    print(f"Protocol result: {'PASS' if report.protocol_ok else 'FAIL'}")
+    if not report.findings:
+        print("Findings: none")
+        return
+    print(f"Findings ({len(report.findings)}):")
+    for finding in report.findings:
+        location = ""
+        if finding.event_index is not None:
+            location = f" at event {finding.event_index}"
+        if finding.cycle is not None:
+            location += f", cycle {finding.cycle}"
+        print(
+            f"  - [{finding.severity}] {finding.rule_id}{location}: {finding.evidence}"
+        )
