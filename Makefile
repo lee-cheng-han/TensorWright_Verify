@@ -9,7 +9,7 @@ help:
 	@echo "  lint        Check Python formatting and lint rules"
 	@echo "  type-check  Run static type checking"
 	@echo "  test        Run the Python test suite"
-	@echo "  lint-rtl    Lint the arithmetic RTL with Verilator"
+	@echo "  lint-rtl    Lint the arithmetic and streaming RTL with Verilator"
 	@echo "  test-rtl    Run vector-driven RTL tests with Verilator"
 	@echo "  test-cocotb Run cocotb RTL tests when supported"
 
@@ -39,7 +39,12 @@ lint-rtl:
 		rtl/compute/tensorwright_adder_tree.sv \
 		rtl/compute/tensorwright_channel_accumulator.sv \
 		rtl/postprocess/tensorwright_postprocess.sv \
-		rtl/compute/tensorwright_arithmetic_core.sv
+		rtl/compute/tensorwright_arithmetic_core.sv \
+		rtl/interfaces/tensorwright_stream_if.sv \
+		rtl/memory/tensorwright_stream_fifo.sv \
+		rtl/memory/tensorwright_activation_buffer.sv \
+		rtl/memory/tensorwright_weight_buffer.sv \
+		rtl/memory/tensorwright_window_generator_3x3.sv
 
 test-rtl:
 	$(PYTHON) -m scripts.run_verilator_tests

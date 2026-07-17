@@ -149,6 +149,16 @@ def main() -> int:
         ],
         core_file,
     )
+    _build_and_run(
+        "tb_streaming",
+        [
+            RTL / "memory" / "tensorwright_stream_fifo.sv",
+            RTL / "memory" / "tensorwright_activation_buffer.sv",
+            RTL / "memory" / "tensorwright_weight_buffer.sv",
+            RTL / "memory" / "tensorwright_window_generator_3x3.sv",
+            VERIFICATION / "tb_streaming.sv",
+        ],
+    )
     print(
         f"RTL differential tests passed: postprocess={postprocess_count}, "
         f"arithmetic_core={core_count}"

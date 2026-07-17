@@ -10,16 +10,18 @@ while reserving physical board deployment and measurements for a future extensio
 
 ## Status
 
-Milestone 5 provides the project specification, installable Python package, compiler,
-bit-accurate INT8 reference, quantized software execution, and a synthesizable nine-lane
-RTL arithmetic core with exact Verilator differential tests. Streaming, integrated
-accelerator control, runtime, deployment bundles, and hardware execution are not yet
-implemented.
+Milestone 6 provides the project specification, installable Python package, compiler,
+bit-accurate INT8 reference, quantized software execution, a synthesizable nine-lane
+RTL arithmetic core, and verified ready/valid streaming, FIFO, weight, activation, and
+3x3 window-buffer blocks. Integrated accelerator control, runtime, deployment bundles,
+and hardware execution are not yet implemented.
 
 The current implementation does not claim RTL-simulated execution, physical FPGA
 execution, measured hardware speedup, board power, DMA latency, or ARM-to-FPGA
 bring-up. See the [simulation-first architecture](docs/architecture.md),
 [roadmap](docs/roadmap.md), and [metric classifications](docs/performance_model.md).
+The RTL transport contract and window packing are documented in
+[streaming and buffering](docs/streaming_and_buffering.md).
 
 ## Development
 

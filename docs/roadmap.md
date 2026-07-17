@@ -12,8 +12,8 @@ Zybo Z7-20. Physical deployment is isolated as future Milestone 17.
 | 3 | Deterministic graph optimizations | Complete |
 | 4 | Calibrated quantized full-model software backend | Complete |
 | 5 | RTL arithmetic core and exact differential unit tests | Complete |
-| 6 | AXI-style streaming, FIFOs, buffering, and backpressure | Next |
-| 7 | Register interface, control, errors, interrupts, and counters | Planned |
+| 6 | AXI-style streaming, FIFOs, buffering, and backpressure | Complete |
+| 7 | Register interface, control, errors, interrupts, and counters | Next |
 | 8 | Integrated reusable RTL convolution engine | Planned |
 | 9 | Memory planning, scheduling, commands, and `.twmodel` bundle | Planned |
 | 10 | Bundle-driven simulation runtime | Planned |
@@ -37,10 +37,10 @@ fabricated values.
 
 ## Next implementation
 
-Milestone 6 is the smallest safe next step. It adds ready/valid streaming, FIFOs, and
-buffering around the verified arithmetic without prematurely implementing registers or
-the simulation runtime. The simulation runtime is deliberately Milestone 10 because it
-must consume stable Milestone 6–9 contracts rather than invent temporary interfaces.
+Milestone 7 is the next step. It adds a stable register and control contract, explicit
+error and interrupt behavior, and cycle/stall counters without prematurely integrating
+the convolution engine. The simulation runtime remains Milestone 10 because it must
+consume stable Milestone 6–9 contracts rather than invent temporary interfaces.
 
 Milestone 17 replaces the simulation transport with an ARM runtime, AXI DMA, physical
 accelerator control, interrupts, and real measurements. It must not require redesign of

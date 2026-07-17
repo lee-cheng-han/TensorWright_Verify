@@ -45,3 +45,10 @@ tests directed and seeded-random post-processing and multi-cycle dot products ag
 the Python reference. Verilator lint and inline reset/input/overflow assertions are part
 of the regression. Cocotb sources are present but could not execute in the current
 Python 3.14 environment because cocotb 2.0.1 supports Python only through 3.13.
+
+Milestone 6 drives the activation FIFO, packetized weight buffer, and 3x3 line/window
+buffer with a fixed-seed pseudo-random pattern of source gaps and sink backpressure.
+The self-checking Verilator test proves ordered delivery of 40 FIFO items, addressable
+delivery of 16 weights, and exact lane packing and `tlast` placement for all nine
+windows of a 5x5 raster. Inline assertions enforce stable stalled outputs, bounded FIFO
+occupancy, known accepted inputs, and correctly placed image `tlast`.
