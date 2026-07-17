@@ -96,8 +96,8 @@ def analyze_protocol_files(
                     comparison.first_divergence.candidate_cycle,
                     "The reference has a semantic coordinate absent from the "
                     "RTL trace.",
-                    "Check output valid generation, backpressure handling, and "
-                    "completion gating.",
+                    "Hold each output valid until ready is high, and advance the "
+                    "output coordinate only after an accepted handshake.",
                 )
             )
         elif kind == "unexpected_candidate_value":
@@ -110,8 +110,8 @@ def analyze_protocol_files(
                     comparison.first_divergence.candidate_cycle,
                     "The RTL trace has a semantic coordinate absent from the "
                     "reference.",
-                    "Check duplicate emission, output counters, and packet restart "
-                    "behavior.",
+                    "Advance the output counter exactly once per accepted handshake "
+                    "and suppress duplicate emission after packet restart.",
                 )
             )
     identity = candidate.events[0]
@@ -135,6 +135,7 @@ def _inspect_stream_events(events: list[TraceEvent]) -> list[ProtocolFinding]:
         )
     for group in groups.values():
         previous_cycle: int | None = None
+        expected_sequence = 0
         for sequence, (event_index, event) in enumerate(group):
             metadata = event.metadata
             if metadata.get("valid") is not True or metadata.get("ready") is not True:
@@ -165,7 +166,7 @@ def _inspect_stream_events(events: list[TraceEvent]) -> list[ProtocolFinding]:
                         "Emit a zero-based accepted-transfer sequence number.",
                     )
                 )
-            elif observed_sequence != sequence:
+            elif observed_sequence != expected_sequence:
                 findings.append(
                     ProtocolFinding(
                         "transfer_sequence_discontinuity",
@@ -173,11 +174,16 @@ def _inspect_stream_events(events: list[TraceEvent]) -> list[ProtocolFinding]:
                         "error",
                         event_index,
                         event.cycle,
-                        f"expected sequence {sequence}, observed {observed_sequence}",
-                        "Check dropped or duplicated handshakes and counter reset "
-                        "timing.",
+                        f"expected sequence {expected_sequence}, "
+                        f"observed {observed_sequence}",
+                        "Increment the sequence counter only on accepted transfers; "
+                        "never advance past an output that was not presented.",
                     )
                 )
+            if isinstance(observed_sequence, int) and not isinstance(
+                observed_sequence, bool
+            ):
+                expected_sequence = observed_sequence + 1
             if event.cycle is None:
                 findings.append(
                     ProtocolFinding(

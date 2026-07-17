@@ -1,4 +1,4 @@
-.PHONY: help setup format lint lint-rtl type-check test test-python test-rtl test-cocotb
+.PHONY: help setup format lint lint-rtl type-check test test-python test-rtl test-cocotb demo
 
 PYTHON ?= python3
 
@@ -12,6 +12,7 @@ help:
 	@echo "  lint-rtl    Lint arithmetic, streaming, and control RTL"
 	@echo "  test-rtl    Run vector-driven RTL tests with Verilator"
 	@echo "  test-cocotb Run cocotb RTL tests when supported"
+	@echo "  demo        Run the video-friendly reference-versus-RTL demo"
 
 setup:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -56,3 +57,6 @@ test-rtl:
 
 test-cocotb:
 	$(PYTHON) -m scripts.run_rtl_tests
+
+demo:
+	$(PYTHON) -m scripts.bootstrap_demo $(DEMO_ARGS)

@@ -49,7 +49,7 @@ custom RTL -> Cocotb simulation          -> canonical hardware trace
                            alignment -> first divergence -> diagnosis
 ```
 
-A future failure report will emphasize the first causal mismatch:
+A failure report emphasizes the first causal mismatch:
 
 ```text
 First divergence: conv2_requant, coordinate [0, 5, 7, 11]
@@ -57,8 +57,8 @@ Reference: -38    Hardware: -36    Cycle: 18,302
 Likely cause: requantization rounding mismatch
 ```
 
-Numerical and protocol diagnosis, minimization, regression generation, and dashboards are
-planned milestones, not current product claims.
+Numerical and protocol diagnosis, minimization, regression generation, dashboards, and
+tested FINN/hls4ml adapters are implemented.
 
 ## Development
 
@@ -90,13 +90,25 @@ tensorwright trace convert transfers.txt rtl.jsonl \
   --adapter tensorwright.verilator_rtl --options @adapter-options.json
 ```
 
+Run the real reference-versus-Verilator hackathon demo with:
+
+```bash
+make demo
+```
+
+It produces a clean 18/18 comparison, a genuine requantization-rounding defect, a
+dropped-transfer protocol defect, first-divergence diagnoses, and self-contained reports
+at `build/demo/index.html` and `build/demo/protocol.html`. See the
+[video demo guide](docs/demo.md) for the recording sequence.
+
 See the [migration assessment](docs/migration_to_verify.md),
 [architecture](docs/architecture.md), [trace format](docs/trace_format.md),
 [trace comparison](docs/trace_comparison.md), [numerical diagnosis](docs/numerical_diagnosis.md),
 [protocol diagnosis](docs/protocol_diagnosis.md), [input minimization](docs/input_minimization.md),
 [regression generation](docs/regression_generation.md), [debugging dashboard](docs/dashboard.md),
 [trace adapter API](docs/trace_adapter_api.md), [FINN adapter](docs/finn_adapter.md),
-[hls4ml adapter](docs/hls4ml_adapter.md), and [roadmap](docs/roadmap.md).
+[hls4ml adapter](docs/hls4ml_adapter.md), [video demo](docs/demo.md), and
+[roadmap](docs/roadmap.md).
 
 ## License
 

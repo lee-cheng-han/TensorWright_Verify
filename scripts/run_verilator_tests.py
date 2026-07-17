@@ -17,8 +17,14 @@ RTL = ROOT / "rtl"
 VERIFICATION = ROOT / "verification" / "systemverilog"
 
 
-def _run(command: list[str]) -> None:
-    subprocess.run(command, cwd=ROOT, check=True)
+def _run(command: list[str], *, quiet: bool = False) -> None:
+    subprocess.run(
+        command,
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.DEVNULL if quiet else None,
+        stderr=subprocess.STDOUT if quiet else None,
+    )
 
 
 def _postprocess_vectors(path: Path) -> int:
@@ -184,8 +190,13 @@ def _build_and_run(
     sources: list[Path],
     vector_file: Path | None = None,
     plusargs: list[str] | None = None,
+    *,
+    build_name: str | None = None,
+    build_root: Path = BUILD,
+    quiet: bool = False,
+    verilator_args: list[str] | None = None,
 ) -> None:
-    build_dir = BUILD / top
+    build_dir = build_root / (build_name or top)
     build_dir.mkdir(parents=True, exist_ok=True)
     _run(
         [
@@ -201,16 +212,18 @@ def _build_and_run(
             "-Wno-WIDTHTRUNC",
             "--top-module",
             top,
+            *(verilator_args or []),
             "--Mdir",
             str(build_dir),
             *[str(source) for source in sources],
-        ]
+        ],
+        quiet=quiet,
     )
     run_command = [str(build_dir / f"V{top}")]
     if vector_file is not None:
         run_command.append(f"+VECTOR_FILE={vector_file}")
     run_command.extend(plusargs or [])
-    _run(run_command)
+    _run(run_command, quiet=quiet)
 
 
 def main() -> int:

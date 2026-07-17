@@ -45,8 +45,13 @@ module tensorwright_postprocess #(
         end else if (shift_i >= 64) begin
             rounded_magnitude = '0;
         end else begin
+`ifdef TENSORWRIGHT_DEMO_FAULT_REQUANT_ROUND
+            // Demo-only defect: truncate instead of adding the round-to-nearest bias.
+            rounded_magnitude = magnitude >> shift_i;
+`else
             rounded_magnitude =
                 (magnitude + (64'd1 << (shift_i - 1'b1))) >> shift_i;
+`endif
         end
 
         if (product < 0) begin

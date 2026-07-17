@@ -7,6 +7,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+import numpy as np
+
 from tensorwright.cli import main
 from tensorwright.dashboard import DashboardError, generate_dashboard
 from tensorwright.trace import TraceEvent, write_trace
@@ -85,6 +87,50 @@ class DashboardTest(unittest.TestCase):
         self.assertIn("Minimization", document)
         self.assertIn("Generated regression", document)
 
+    def test_renders_video_presentation_context_and_tensor_slice(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reference, candidate = self._traces(
+                directory, _reference(10), _candidate(11)
+            )
+            baseline = write_trace(root / "baseline.jsonl", [_candidate(10)])
+            regression = root / "test_case.py"
+            regression.write_text(
+                "def test_case():\n    assert True\n", encoding="utf-8"
+            )
+            output = root / "dashboard.html"
+            generate_dashboard(
+                reference,
+                candidate,
+                output,
+                baseline_candidate_trace=baseline,
+                scenario_note="One-unit controlled fault",
+                arithmetic_evidence={
+                    "accumulator": 24,
+                    "bias": -491,
+                    "biased": -467,
+                    "multiplier": 1,
+                    "shift": 2,
+                    "product": -467,
+                    "rounding_offset": 2,
+                    "software_result": -117,
+                    "rtl_result": -116,
+                },
+                generated_regression=regression,
+            )
+            document = output.read_text(encoding="utf-8")
+        self.assertIn("Controlled demo fault", document)
+        self.assertIn("1/1 values matched", document)
+        self.assertIn("SOFTWARE", document)
+        self.assertIn("RTL", document)
+        self.assertIn("Bounded tensor window", document)
+        self.assertIn("Values before first divergence", document)
+        self.assertIn("Why this value differs", document)
+        self.assertIn("Rounding + shift", document)
+        self.assertIn("Recommended fix", document)
+        self.assertIn("rounded_magnitude", document)
+        self.assertIn("Bug locked into regression", document)
+
     def test_escapes_untrusted_trace_content(self) -> None:
         malicious = "model<script>alert(1)</script>"
         with tempfile.TemporaryDirectory() as directory:
@@ -98,6 +144,72 @@ class DashboardTest(unittest.TestCase):
             document = output.read_text(encoding="utf-8")
         self.assertNotIn(malicious, document)
         self.assertIn("&lt;script&gt;", document)
+
+    def test_large_chunk_renders_only_bounded_failure_window(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shape = [1, 1, 1024, 1024]
+            reference_value = np.zeros(shape, dtype=np.int16)
+            candidate_value = reference_value.copy()
+            candidate_value[0, 0, 512, 512] = 1
+            paths: list[Path] = []
+            for name, backend, value in (
+                ("reference", "tensorwright.python_reference", reference_value),
+                ("candidate", "tensorwright.verilator_rtl", candidate_value),
+            ):
+                trace_root = root / name
+                trace_root.mkdir()
+                np.save(trace_root / "payload.npy", value, allow_pickle=False)
+                event = _event(
+                    0,
+                    [0, 0, 0, 0],
+                    backend=backend,
+                    trace_point=(
+                        "operation_output"
+                        if name == "reference"
+                        else "stream_transfer"
+                    ),
+                )
+                data = event.to_dict()
+                data.update(
+                    {
+                        "event_type": "tensor_chunk",
+                        "shape": shape,
+                        "dtype": "int16",
+                        "value": None,
+                        "coordinate": None,
+                        "start_coordinate": [0, 0, 0, 0],
+                        "chunk_shape": shape,
+                        "data_file": "payload.npy",
+                    }
+                )
+                paths.append(
+                    write_trace(
+                        trace_root / "trace.jsonl", [TraceEvent.from_dict(data)]
+                    )
+                )
+            output = root / "dashboard.html"
+            generate_dashboard(paths[0], paths[1], output)
+            document = output.read_text(encoding="utf-8")
+        self.assertIn("Bounded tensor window", document)
+        self.assertIn("[0, 0, 512, 512]", document)
+        self.assertIn("Δ +1", document)
+        tensor_table = document.split('<table class="tensor-grid">', 1)[1].split(
+            "</table>", 1
+        )[0]
+        self.assertLessEqual(tensor_table.count("<td"), 25)
+
+    def test_generated_source_preview_is_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self._traces(directory, _reference(10), _candidate(11))
+            source = root / "large_test.py"
+            source.write_text("x" * 20_000 + "TAIL", encoding="utf-8")
+            output = root / "dashboard.html"
+            generate_dashboard(*paths, output, generated_regression=source)
+            document = output.read_text(encoding="utf-8")
+        self.assertIn("preview truncated by TensorWright", document)
+        self.assertNotIn("TAIL", document)
 
     def test_is_deterministic_and_validates_optional_json(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

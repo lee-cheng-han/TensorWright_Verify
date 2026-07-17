@@ -85,6 +85,20 @@ def compare_trace_files(
             f"{reference_identity.model_id} != {candidate_identity.model_id}"
         )
 
+    chunk_report = _compare_chunk_events(
+        reference.events,
+        candidate.events,
+        reference_source.parent,
+        candidate_source.parent,
+    )
+    if chunk_report is not None:
+        return ComparisonReport(
+            reference_backend=reference_identity.source_backend,
+            candidate_backend=candidate_identity.source_backend,
+            model_id=reference_identity.model_id,
+            **chunk_report,
+        )
+
     reference_values = _index_values(reference.events, reference_source.parent)
     candidate_values = _index_values(candidate.events, candidate_source.parent)
     ordered_keys = list(reference_values)
@@ -117,6 +131,138 @@ def compare_trace_files(
         candidate_values=len(candidate_values),
         first_divergence=divergence,
     )
+
+
+def _compare_chunk_events(
+    reference_events: list[TraceEvent],
+    candidate_events: list[TraceEvent],
+    reference_directory: Path,
+    candidate_directory: Path,
+) -> dict[str, Any] | None:
+    all_events = reference_events + candidate_events
+    if any(event.event_type != "tensor_chunk" for event in all_events):
+        return None
+    reference_index = _index_chunks(reference_events)
+    candidate_index = _index_chunks(candidate_events)
+    ordered_keys = list(reference_index)
+    ordered_keys.extend(key for key in candidate_index if key not in reference_index)
+    matched_values = 0
+    divergence: Divergence | None = None
+    for key in ordered_keys:
+        reference = reference_index.get(key)
+        candidate = candidate_index.get(key)
+        if reference is None:
+            assert candidate is not None
+            actual = _first_chunk_value(candidate, candidate_directory)
+            divergence = _divergence("unexpected_candidate_value", None, actual)
+            break
+        if candidate is None:
+            expected = _first_chunk_value(reference, reference_directory)
+            divergence = _divergence("missing_candidate_value", expected, None)
+            break
+        expected_payload = _load_chunk(reference, reference_directory)
+        actual_payload = _load_chunk(candidate, candidate_directory)
+        if not _metadata_compatible(reference, candidate):
+            expected = _array_value(
+                reference, expected_payload, (0,) * expected_payload.ndim
+            )
+            actual = _array_value(
+                candidate, actual_payload, (0,) * actual_payload.ndim
+            )
+            divergence = _divergence("metadata_mismatch", expected, actual)
+            break
+        mismatch = _first_array_mismatch(expected_payload, actual_payload)
+        if mismatch is not None:
+            matched_values += int(
+                np.ravel_multi_index(mismatch, expected_payload.shape)
+            )
+            expected = _array_value(reference, expected_payload, mismatch)
+            actual = _array_value(candidate, actual_payload, mismatch)
+            divergence = _divergence("value_mismatch", expected, actual)
+            break
+        matched_values += expected_payload.size
+    return {
+        "matched_values": matched_values,
+        "reference_values": sum(_chunk_size(event) for event in reference_events),
+        "candidate_values": sum(_chunk_size(event) for event in candidate_events),
+        "first_divergence": divergence,
+    }
+
+
+def _index_chunks(events: list[TraceEvent]) -> dict[SemanticKey, TraceEvent]:
+    indexed: dict[SemanticKey, TraceEvent] = {}
+    for event in events:
+        assert event.start_coordinate is not None
+        value = AlignedValue(event, tuple(event.start_coordinate), 0)
+        key = _semantic_key(value)
+        if key in indexed:
+            raise AlignmentError(
+                f"Ambiguous duplicate tensor chunk for {event.tensor_name}"
+            )
+        indexed[key] = event
+    return indexed
+
+
+def _load_chunk(event: TraceEvent, directory: Path) -> np.ndarray[Any, Any]:
+    assert event.data_file is not None and event.chunk_shape is not None
+    payload = np.load(directory / event.data_file, mmap_mode="r", allow_pickle=False)
+    if list(payload.shape) != event.chunk_shape:
+        raise AlignmentError(
+            f"Tensor payload shape {list(payload.shape)} does not match "
+            f"declared chunk shape {event.chunk_shape}"
+        )
+    if str(payload.dtype) != event.dtype:
+        raise AlignmentError(
+            f"Tensor payload dtype {payload.dtype} does not match declared dtype "
+            f"{event.dtype}"
+        )
+    return payload
+
+
+def _first_array_mismatch(
+    reference: np.ndarray[Any, Any], candidate: np.ndarray[Any, Any]
+) -> tuple[int, ...] | None:
+    if reference.shape != candidate.shape:
+        return (0,) * reference.ndim
+    reference_flat = reference.reshape(-1)
+    candidate_flat = candidate.reshape(-1)
+    block_size = 65_536
+    for start in range(0, reference_flat.size, block_size):
+        stop = min(reference_flat.size, start + block_size)
+        unequal = np.flatnonzero(
+            reference_flat[start:stop] != candidate_flat[start:stop]
+        )
+        if unequal.size:
+            coordinate = np.unravel_index(
+                start + int(unequal[0]), reference.shape
+            )
+            return tuple(int(index) for index in coordinate)
+    return None
+
+
+def _array_value(
+    event: TraceEvent,
+    payload: np.ndarray[Any, Any],
+    local_coordinate: tuple[int, ...],
+) -> AlignedValue:
+    assert event.start_coordinate is not None
+    coordinate = tuple(
+        start + offset
+        for start, offset in zip(
+            event.start_coordinate, local_coordinate, strict=True
+        )
+    )
+    return AlignedValue(event, coordinate, payload[local_coordinate].item())
+
+
+def _first_chunk_value(event: TraceEvent, directory: Path) -> AlignedValue:
+    payload = _load_chunk(event, directory)
+    return _array_value(event, payload, (0,) * payload.ndim)
+
+
+def _chunk_size(event: TraceEvent) -> int:
+    assert event.chunk_shape is not None
+    return int(np.prod(event.chunk_shape))
 
 
 def _index_values(

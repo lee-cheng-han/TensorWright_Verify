@@ -109,10 +109,27 @@ module tensorwright_convolution_engine #(
                 WAIT_RESULT: begin
                     if (core_overflow) overflow_o <= 1;
                     if (core_result_valid) begin
-                        output_tdata_o <= core_result; output_tvalid_o <= 1;
+`ifdef TENSORWRIGHT_DEMO_FAULT_DROPPED_TRANSFER
+                        // Demo-only protocol defect: logical output 4 is consumed
+                        // internally without ever presenting a valid transfer.
+                        if (output_channel == 0 && output_y == 1 && output_x == 1) begin
+                            output_tvalid_o <= 0;
+                            output_x <= output_x + 1'b1;
+                            state <= COMPUTE;
+                        end else begin
+                            output_tdata_o <= core_result;
+                            output_tvalid_o <= 1;
+                            output_tlast_o <= output_channel == LAST_OUTPUT_CHANNEL &&
+                                output_y == LAST_OUTPUT_Y && output_x == LAST_OUTPUT_X;
+                            state <= OUTPUT;
+                        end
+`else
+                        output_tdata_o <= core_result;
+                        output_tvalid_o <= 1;
                         output_tlast_o <= output_channel == LAST_OUTPUT_CHANNEL &&
                             output_y == LAST_OUTPUT_Y && output_x == LAST_OUTPUT_X;
                         state <= OUTPUT;
+`endif
                     end
                 end
                 OUTPUT: if (output_tvalid_o && output_tready_i) begin

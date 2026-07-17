@@ -29,9 +29,13 @@ module tb_convolution_engine;
 
     initial begin : test
         integer file, trace_file, scanned, case_count, case_index, index, sent, received, cycles, simulation_cycle;
+        integer expected_transfers, logical_sequence;
         integer bias_value, multiplier_value, shift_value, relu_value;
         logic [31:0] lfsr; logic source_fire, sink_fire;
+        logic allow_mismatch;
         string vector_file, trace_path;
+        allow_mismatch = $test$plusargs("ALLOW_MISMATCH");
+        expected_transfers = $test$plusargs("EXPECT_DROPPED_TRANSFER") ? 17 : 18;
         if (!$value$plusargs("VECTOR_FILE=%s", vector_file)) $fatal(1, "VECTOR_FILE missing");
         file = $fopen(vector_file, "r"); if (!file) $fatal(1, "cannot open vectors");
         trace_file = 0;
@@ -71,18 +75,22 @@ module tb_convolution_engine;
                 cycles++; if (cycles > 4000) $fatal(1, "activation timeout");
             end
             received = 0;
-            while (received < 18) begin
+            while (received < expected_transfers) begin
                 @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
                 output_ready = lfsr[4] | lfsr[7]; #1; sink_fire = output_valid && output_ready;
                 if (sink_fire) begin
-                    if (output_data !== 8'(expected[received])) $fatal(1, "case %0d output %0d: got %0d expected %0d", case_index, received, output_data, expected[received]);
-                    if (output_last !== (received == 17)) $fatal(1, "TLAST mismatch");
+                    logical_sequence = int'(dut.output_channel) * 9 +
+                        int'(dut.output_y) * 3 + int'(dut.output_x);
+                    if (!allow_mismatch && output_data !== 8'(expected[logical_sequence]))
+                        $fatal(1, "case %0d output %0d: got %0d expected %0d", case_index, logical_sequence, output_data, expected[logical_sequence]);
+                    if (!allow_mismatch && output_last !== (logical_sequence == 17))
+                        $fatal(1, "TLAST mismatch");
                 end
                 @(posedge clk); #1;
                 simulation_cycle++;
                 if (sink_fire) begin
                     if ((trace_file != 0) && (case_index == 0))
-                        $fdisplay(trace_file, "%0d %0d %0d 1 1 %0d", received, simulation_cycle, $signed(output_data), output_last);
+                        $fdisplay(trace_file, "%0d %0d %0d 1 1 %0d", logical_sequence, simulation_cycle, $signed(output_data), output_last);
                     received++;
                 end
                 cycles++; if (cycles > 8000) $fatal(1, "output timeout");

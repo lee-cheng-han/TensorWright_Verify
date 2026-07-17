@@ -61,7 +61,8 @@ def _classify(divergence: Divergence) -> Diagnosis:
             ],
             recommended_checks=[
                 "Check trace coverage and semantic mappings.",
-                "Use Milestone 15 protocol analysis for missing or extra transfers.",
+                "Review the automatically generated protocol findings for missing, "
+                "extra, or discontinuous transfers.",
             ],
         )
 

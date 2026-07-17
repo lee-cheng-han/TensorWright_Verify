@@ -100,7 +100,10 @@ class TraceDiagnosisTest(unittest.TestCase):
         )
         assert report.diagnosis is not None
         self.assertEqual(report.diagnosis.rule_id, "insufficient_numerical_evidence")
-        self.assertIn("Milestone 15", report.diagnosis.recommended_checks[1])
+        self.assertIn(
+            "automatically generated protocol findings",
+            report.diagnosis.recommended_checks[1],
+        )
 
     def test_matching_comparison_needs_no_diagnosis(self) -> None:
         comparison = ComparisonReport(
