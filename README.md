@@ -35,8 +35,8 @@ TensorWright RTL output stream. The self-checking Verilator regression produces 
 trace; the simulator-independent capture API is also suitable for Cocotb monitors. The
 comparison engine aligns scalar and chunked payloads across these backends and reports the
 first missing, unexpected, structurally incompatible, or unequal value. Deterministic rules
-classify supported numerical patterns without claiming protocol causes. A real-tested FINN
-full execution-context adapter is maintained; hls4ml remains planned only. A separate protocol analyzer checks
+classify supported numerical patterns without claiming protocol causes. Real-tested FINN
+full-context and hls4ml C-simulation adapters are maintained. A separate protocol analyzer checks
 ready/valid acceptance, transfer order, cycle order, packet boundaries, and transfer counts.
 
 ## Planned verification workflow
@@ -96,7 +96,7 @@ See the [migration assessment](docs/migration_to_verify.md),
 [protocol diagnosis](docs/protocol_diagnosis.md), [input minimization](docs/input_minimization.md),
 [regression generation](docs/regression_generation.md), [debugging dashboard](docs/dashboard.md),
 [trace adapter API](docs/trace_adapter_api.md), [FINN adapter](docs/finn_adapter.md),
-and [roadmap](docs/roadmap.md).
+[hls4ml adapter](docs/hls4ml_adapter.md), and [roadmap](docs/roadmap.md).
 
 ## License
 

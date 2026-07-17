@@ -18,7 +18,8 @@ Milestones 11–19 implement the canonical trace contract, Python-reference writ
 accepted-transfer capture at the convolution RTL output, semantic alignment, and first-
 divergence detection, deterministic numerical and protocol diagnosis, and failure-preserving
 input minimization, portable Cocotb regression generation, offline debugging dashboards, and a
-versioned trace-adapter plugin API and a tested FINN full execution-context adapter.
+versioned trace-adapter plugin API, a tested FINN full execution-context adapter, and a
+tested hls4ml C-simulation trace adapter.
 
 ## Preserved supporting infrastructure
 
@@ -32,5 +33,6 @@ fault-injection target.
 
 Compilation is now a lower-level workload and metadata preparation mechanism, not the
 primary product. Existing bundle and `simulate` workflows remain compatible. FINN full
-execution-context traces are supported; hls4ml and future adapters must convert real tested traces into the same
+execution-context and hls4ml C-simulation traces are supported; future adapters must
+convert real tested traces into the same
 canonical schema.

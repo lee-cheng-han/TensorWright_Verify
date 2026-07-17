@@ -233,6 +233,12 @@ class VerilatorTransferLogAdapter:
 class FinnExecutionContextAdapter:
     """Convert FINN's saved full execution context into canonical traces."""
 
+    artifact_label = "FINN execution context"
+    default_graph_stage = "finn_execution"
+    default_hardware_stage = "finn_operation_output"
+    metadata_key = "finn_context_key"
+    payload_prefix = "finn"
+
     descriptor = AdapterDescriptor(
         name="finn.dataflow",
         version="1.0.0",
@@ -256,7 +262,7 @@ class FinnExecutionContextAdapter:
         run_id = _string_option(request.options, "run_id")
         model_id = _string_option(request.options, "model_id")
         graph_stage = _optional_string(
-            request.options, "graph_stage", "finn_execution"
+            request.options, "graph_stage", self.default_graph_stage
         )
         limit = request.options.get("scalar_event_limit", 4096)
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
@@ -269,30 +275,30 @@ class FinnExecutionContextAdapter:
             archive = np.load(request.source, allow_pickle=False)
         except (OSError, ValueError) as error:
             raise AdapterError(
-                f"Could not read FINN execution context: {error}"
+                f"Could not read {self.artifact_label}: {error}"
             ) from error
 
         events: list[TraceEvent] = []
         seen: set[str] = set()
         try:
             for index, raw_mapping in enumerate(mappings):
-                mapping = _finn_tensor_mapping(raw_mapping, index)
+                mapping = _npz_tensor_mapping(raw_mapping, index)
                 tensor_name = mapping["tensor_name"]
                 if tensor_name in seen:
-                    raise AdapterError(f"Duplicate FINN tensor mapping: {tensor_name}")
+                    raise AdapterError(f"Duplicate tensor mapping: {tensor_name}")
                 seen.add(tensor_name)
                 if tensor_name not in archive.files:
                     raise AdapterError(
-                        f"FINN execution context has no tensor {tensor_name!r}"
+                        f"{self.artifact_label} has no tensor {tensor_name!r}"
                     )
                 value = np.asarray(archive[tensor_name])
                 if value.ndim == 0:
                     value = value.reshape(1)
                 if value.size == 0 or any(size <= 0 for size in value.shape):
-                    raise AdapterError(f"FINN tensor {tensor_name!r} is empty")
+                    raise AdapterError(f"Tensor {tensor_name!r} is empty")
                 if value.dtype.kind not in "iuf":
                     raise AdapterError(
-                        f"FINN tensor {tensor_name!r} has non-numeric dtype "
+                        f"Tensor {tensor_name!r} has non-numeric dtype "
                         f"{value.dtype}"
                     )
                 common: dict[str, Any] = {
@@ -309,20 +315,22 @@ class FinnExecutionContextAdapter:
                     "operation_name": mapping["operation_name"],
                     "operation_type": mapping["operation_type"],
                     "hardware_stage": mapping.get(
-                        "hardware_stage", "finn_operation_output"
+                        "hardware_stage", self.default_hardware_stage
                     ),
                     "trace_point": "operation_output",
                     "tensor_name": tensor_name,
                     "shape": list(value.shape),
                     "layout": mapping.get("layout", "unknown"),
                     "dtype": str(value.dtype),
-                    "metadata": {"finn_context_key": tensor_name},
+                    "metadata": {self.metadata_key: tensor_name},
                 }
                 if value.size > limit:
                     payload_dir = request.destination.parent / "tensors"
                     payload_dir.mkdir(parents=True, exist_ok=True)
                     safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", tensor_name)
-                    payload_name = f"finn_{index:04d}_{safe_name}.npy"
+                    payload_name = (
+                        f"{self.payload_prefix}_{index:04d}_{safe_name}.npy"
+                    )
                     np.save(payload_dir / payload_name, value, allow_pickle=False)
                     events.append(
                         TraceEvent(
@@ -348,10 +356,29 @@ class FinnExecutionContextAdapter:
         return write_trace(request.destination, events)
 
 
+class Hls4mlCsimTraceAdapter(FinnExecutionContextAdapter):
+    """Convert hls4ml ModelGraph.trace arrays into canonical traces."""
+
+    artifact_label = "hls4ml C-simulation trace"
+    default_graph_stage = "hls4ml_optimized_graph"
+    default_hardware_stage = "hls4ml_layer_output"
+    metadata_key = "hls4ml_trace_key"
+    payload_prefix = "hls4ml"
+    descriptor = AdapterDescriptor(
+        name="hls4ml.csim",
+        version="1.0.0",
+        api_version=ADAPTER_API_VERSION,
+        input_formats=("hls4ml-modelgraph-trace-npz",),
+        trace_points=("operation_output",),
+        description="Convert hls4ml C-simulation layer traces to canonical traces.",
+    )
+
+
 def default_adapter_registry(*, discover: bool = False) -> AdapterRegistry:
     """Create an isolated registry containing maintained built-in adapters."""
     registry = AdapterRegistry()
     registry.register(FinnExecutionContextAdapter())
+    registry.register(Hls4mlCsimTraceAdapter())
     registry.register(VerilatorTransferLogAdapter())
     if discover:
         registry.discover()
@@ -371,7 +398,7 @@ def _optional_string(options: dict[str, Any], name: str, default: str) -> str:
     return _string_option(options, name)
 
 
-def _finn_tensor_mapping(value: Any, index: int) -> dict[str, Any]:
+def _npz_tensor_mapping(value: Any, index: int) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AdapterError(f"tensors[{index}] must be an object")
     allowed = {

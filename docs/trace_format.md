@@ -21,8 +21,8 @@ Backend identifiers are extensible dotted names such as
 `tensorwright.python_reference`, `tensorwright.cocotb_rtl`,
 `tensorwright.verilator_rtl`, or `custom.my_adapter`.
 Schema validation rejects malformed names, not unknown well-formed adapters. A later
-adapter registry will determine execution and interpretation capabilities. FINN and
-hls4ml names do not imply adapters exist.
+adapter registry determines execution and interpretation capabilities. Registered built-ins
+currently include FINN full-context and hls4ml C-simulation conversion.
 
 Unsupported versions, non-finite values/scales, rank mismatches, out-of-range
 coordinates/chunks, unsafe payload paths, negative cycles, empty traces, mixed run

@@ -67,5 +67,5 @@ entire canonical trace and requires `source_backend` to equal the registered ada
 
 Entry-point discovery executes installed Python code, so it is opt-in in the CLI. An adapter
 failure names its entry point or registered backend and does not leave the output accepted as a
-valid conversion. The registry does not imply FINN or hls4ml support; those names become supported
+valid conversion. A backend name alone does not imply support; a source becomes supported
 only after real, backend-tested adapters exist.

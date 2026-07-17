@@ -18,7 +18,7 @@ the command-driven simulation runtime.
 | 18 | Debugging dashboard | Complete |
 | 19 | Trace-adapter plugin API | Complete |
 | 20 | Real tested FINN adapter | Complete |
-| 21 | Real tested hls4ml adapter | Future |
+| 21 | Real tested hls4ml adapter | Complete |
 
 Milestone 12 adds optional operation-output traces from the Python reference and accepted
 output-stream transfers from the custom RTL. The simulator-independent adapter is usable
@@ -66,3 +66,10 @@ small tensors use scalar events and larger tensors use external NumPy payloads. 
 integration script invokes FINN's real full-context executor and verifies converted values.
 The adapter does not infer cycles or streaming handshakes absent from FINN's context. The
 real tested hls4ml adapter begins in Milestone 21.
+
+Milestone 21 adds the maintained `hls4ml.csim` converter for layer arrays returned by
+hls4ml's real C-simulation trace API. Explicit mappings retain source and optimized-graph
+operation identity, and the shared NPZ conversion path provides scalar and chunked events.
+The integration script compiles and traces a real hls4ml Dense/Activation graph and verifies
+the resulting canonical values. It accurately identifies C simulation and does not claim
+RTL timing evidence. This completes the currently defined TensorWright Verify roadmap.

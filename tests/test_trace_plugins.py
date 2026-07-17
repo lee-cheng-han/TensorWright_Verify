@@ -225,6 +225,51 @@ class TracePluginTest(unittest.TestCase):
                     ),
                 )
 
+    def test_builtin_hls4ml_adapter_converts_csim_layer_trace(self) -> None:
+        options = {
+            "run_id": "hls4ml_run_1",
+            "model_id": "hls4ml_tiny",
+            "tensors": [
+                {
+                    "tensor_name": "dense",
+                    "source_operation_id": "keras:dense",
+                    "compiled_operation_id": "hls4ml:dense",
+                    "operation_name": "dense",
+                    "operation_type": "Dense",
+                    "layout": "NC",
+                },
+                {
+                    "tensor_name": "relu",
+                    "source_operation_id": "keras:relu",
+                    "compiled_operation_id": "hls4ml:relu",
+                    "operation_name": "relu",
+                    "operation_type": "Activation",
+                    "layout": "NC",
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "hls4ml_trace.npz"
+            np.savez(
+                source,
+                dense=np.array([[12.0, 15.0]], dtype=np.float64),
+                relu=np.array([[12.0, 15.0]], dtype=np.float64),
+            )
+            output = default_adapter_registry().convert(
+                "hls4ml.csim",
+                AdapterRequest(source, root / "trace.jsonl", options),
+            )
+            events = read_trace(output).events
+        self.assertEqual([event.value for event in events], [12.0, 15.0] * 2)
+        self.assertTrue(
+            all(event.source_backend == "hls4ml.csim" for event in events)
+        )
+        self.assertTrue(
+            all(event.hardware_stage == "hls4ml_layer_output" for event in events)
+        )
+        self.assertEqual(events[0].metadata, {"hls4ml_trace_key": "dense"})
+
     def test_cli_lists_and_converts_with_options_file(self) -> None:
         listing = StringIO()
         with redirect_stdout(listing):
