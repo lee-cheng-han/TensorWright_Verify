@@ -150,9 +150,7 @@ def conv2d_int8(
                 accumulator = 0
                 for input_channel in range(input_channels):
                     for kernel_y in range(kernel_height):
-                        input_y = (
-                            output_y * config.stride_height + kernel_y - pad_top
-                        )
+                        input_y = output_y * config.stride_height + kernel_y - pad_top
                         for kernel_x in range(kernel_width):
                             input_x = (
                                 output_x * config.stride_width + kernel_x - pad_left
@@ -194,9 +192,7 @@ def _check_channel_parameters(
     multipliers: list[int],
     shifts: list[int],
 ) -> None:
-    if not (
-        len(biases) == len(multipliers) == len(shifts) == output_channels
-    ):
+    if not (len(biases) == len(multipliers) == len(shifts) == output_channels):
         raise ValueError("biases, multipliers, and shifts need one value per output")
     for bias in biases:
         _check_range("bias", bias, INT32_MIN, INT32_MAX)
@@ -224,13 +220,15 @@ def _shape_4d(name: str, values: Tensor4D) -> tuple[int, int, int, int]:
     channels = len(values[0])
     height = len(values[0][0])
     width = len(values[0][0][0])
-    if any(len(output) != channels for output in values) or any(
-        len(kernel) != height for output in values for kernel in output
-    ) or any(
-        len(row) != width
-        for output in values
-        for kernel in output
-        for row in kernel
+    if (
+        any(len(output) != channels for output in values)
+        or any(len(kernel) != height for output in values for kernel in output)
+        or any(
+            len(row) != width
+            for output in values
+            for kernel in output
+            for row in kernel
+        )
     ):
         raise ValueError(f"{name} must be rectangular")
     return len(values), channels, height, width

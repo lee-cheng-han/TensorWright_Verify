@@ -16,3 +16,8 @@ backpressure. Failed randomized tests must report their seed.
 Claims about timing, utilization, accuracy, throughput, power, or ASIC results require
 actual tool reports or measurements. Missing tools and skipped validation are reported
 explicitly.
+
+Milestone 2 tests ONNX file loading, checker failures, strict static-shape enforcement,
+opset capture, attribute and initializer extraction, producer-consumer relationships,
+explicit unsupported-operation errors, and deterministic IR serialization. Models are
+constructed in memory by the tests so fixtures remain small and reviewable.

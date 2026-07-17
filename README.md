@@ -4,10 +4,11 @@ TensorWright is a hardware-aware machine-learning compiler and FPGA inference pl
 
 ## Status
 
-Milestone 1 provides the project specification, installable Python package, CLI,
-documentation contracts, and a tested bit-accurate INT8 software reference for
-quantization, requantization, saturation, and batch-one convolution. Compiler, runtime,
-and RTL behavior are intentionally not implemented yet.
+Milestone 2 provides the project specification, installable Python package, CLI,
+bit-accurate INT8 software reference, and an ONNX frontend that validates statically
+shaped supported graphs and converts them to typed, serializable TensorWright IR.
+Optimization, quantized full-model execution, runtime, and RTL behavior are intentionally
+not implemented yet.
 
 ## Development
 
