@@ -9,8 +9,8 @@ the command-driven simulation runtime.
 | --- | --- | --- |
 | 0–10 | Original compiler, numerical, RTL, bundle, and runtime foundation | Complete |
 | 11 | Product migration and canonical trace specification | Complete |
-| 12 | Python-reference and Cocotb RTL trace capture | Next |
-| 13 | Semantic alignment and first-divergence detection | Planned |
+| 12 | Python-reference and RTL trace capture | Complete |
+| 13 | Semantic alignment and first-divergence detection | Next |
 | 14 | Deterministic numerical diagnosis rules | Planned |
 | 15 | Streaming and protocol diagnosis | Planned |
 | 16 | Deterministic failing-input minimization | Planned |
@@ -20,5 +20,8 @@ the command-driven simulation runtime.
 | 20 | Real tested FINN adapter | Future |
 | 21 | Real tested hls4ml adapter | Future |
 
-Milestone 12 will add optional intermediate traces from the existing Python reference
-and custom RTL/Cocotb path. It will not implement alignment or diagnosis.
+Milestone 12 adds optional operation-output traces from the Python reference and accepted
+output-stream transfers from the custom RTL. The simulator-independent adapter is usable
+from Cocotb; the Verilator regression emits the same compact samples and converts them to
+canonical JSONL. Capture is intentionally limited to the stable convolution output boundary.
+It does not implement alignment or diagnosis.

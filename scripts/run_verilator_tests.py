@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from tensorwright.reference import requantize_int32
+from tensorwright.trace.adapters.rtl import RtlTraceCapture, read_transfer_log
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build" / "rtl_vectors"
@@ -143,7 +144,10 @@ def _convolution_vectors(path: Path) -> int:
 
 
 def _build_and_run(
-    top: str, sources: list[Path], vector_file: Path | None = None
+    top: str,
+    sources: list[Path],
+    vector_file: Path | None = None,
+    plusargs: list[str] | None = None,
 ) -> None:
     build_dir = BUILD / top
     build_dir.mkdir(parents=True, exist_ok=True)
@@ -169,6 +173,7 @@ def _build_and_run(
     run_command = [str(build_dir / f"V{top}")]
     if vector_file is not None:
         run_command.append(f"+VECTOR_FILE={vector_file}")
+    run_command.extend(plusargs or [])
     _run(run_command)
 
 
@@ -180,6 +185,7 @@ def main() -> int:
     postprocess_count = _postprocess_vectors(postprocess_file)
     core_count = _core_vectors(core_file)
     convolution_count = _convolution_vectors(convolution_file)
+    rtl_transfer_file = BUILD / "convolution_rtl_transfers.txt"
     _build_and_run(
         "tb_primitives",
         [
@@ -238,10 +244,26 @@ def main() -> int:
             VERIFICATION / "tb_convolution_engine.sv",
         ],
         convolution_file,
+        [f"+TRACE_FILE={rtl_transfer_file}"],
     )
+    capture = RtlTraceCapture(
+        enabled=True,
+        run_id="verilator_convolution_case_0000",
+        model_id="rtl_convolution_regression",
+        source_operation_id="synthetic:conv_0",
+        compiled_operation_id="compiled:op_0000",
+        operation_name="conv_0",
+        tensor_name="conv_0_output",
+        shape=[1, 2, 3, 3],
+        source_backend="tensorwright.verilator_rtl",
+    )
+    for transfer in read_transfer_log(rtl_transfer_file):
+        capture.record(transfer)
+    trace_path = capture.write(BUILD / "convolution_rtl_trace.jsonl")
     print(
         f"RTL differential tests passed: postprocess={postprocess_count}, "
-        f"arithmetic_core={core_count}, convolution_layers={convolution_count}"
+        f"arithmetic_core={core_count}, convolution_layers={convolution_count}, "
+        f"rtl_trace={trace_path}"
     )
     return 0
 

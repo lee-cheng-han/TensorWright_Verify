@@ -14,8 +14,9 @@ ONNX or QONNX model
                                                                          -> regression
 ```
 
-Milestone 11 implements only the canonical trace contract and Python-reference writer.
-RTL trace capture begins in Milestone 12; alignment and debugging stages follow later.
+Milestones 11 and 12 implement the canonical trace contract, Python-reference writer,
+and accepted-transfer capture at the convolution RTL output. Alignment and debugging
+stages follow in Milestone 13 and later.
 
 ## Preserved supporting infrastructure
 

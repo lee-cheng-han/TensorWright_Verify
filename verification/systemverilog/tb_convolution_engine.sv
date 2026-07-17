@@ -28,17 +28,22 @@ module tb_convolution_engine;
     );
 
     initial begin : test
-        integer file, scanned, case_count, case_index, index, sent, received, cycles;
+        integer file, trace_file, scanned, case_count, case_index, index, sent, received, cycles, simulation_cycle;
         integer bias_value, multiplier_value, shift_value, relu_value;
         logic [31:0] lfsr; logic source_fire, sink_fire;
-        string vector_file;
+        string vector_file, trace_path;
         if (!$value$plusargs("VECTOR_FILE=%s", vector_file)) $fatal(1, "VECTOR_FILE missing");
         file = $fopen(vector_file, "r"); if (!file) $fatal(1, "cannot open vectors");
+        trace_file = 0;
+        if ($value$plusargs("TRACE_FILE=%s", trace_path)) begin
+            trace_file = $fopen(trace_path, "w");
+            if (!trace_file) $fatal(1, "cannot open trace output");
+        end
         scanned = $fscanf(file, "%d", case_count);
         weight_valid = 0; activation_valid = 0; output_ready = 0; weight_data = 0;
         activation_data = 0; weight_last = 0; activation_last = 0;
         repeat (3) @(posedge clk); rst_n = 1; @(posedge clk);
-        lfsr = 32'h243f6a88;
+        lfsr = 32'h243f6a88; simulation_cycle = 0;
         for (case_index = 0; case_index < case_count; case_index++) begin
             for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", bias_value); biases[index] = bias_value; end
             for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", multiplier_value); multipliers[index] = multiplier_value; end
@@ -73,12 +78,19 @@ module tb_convolution_engine;
                     if (output_data !== 8'(expected[received])) $fatal(1, "case %0d output %0d: got %0d expected %0d", case_index, received, output_data, expected[received]);
                     if (output_last !== (received == 17)) $fatal(1, "TLAST mismatch");
                 end
-                @(posedge clk); #1; if (sink_fire) received++;
+                @(posedge clk); #1;
+                simulation_cycle++;
+                if (sink_fire) begin
+                    if ((trace_file != 0) && (case_index == 0))
+                        $fdisplay(trace_file, "%0d %0d %0d 1 1 %0d", received, simulation_cycle, $signed(output_data), output_last);
+                    received++;
+                end
                 cycles++; if (cycles > 8000) $fatal(1, "output timeout");
             end
             if (!done || busy || overflow) $fatal(1, "completion state mismatch");
         end
         $fclose(file);
+        if (trace_file != 0) $fclose(trace_file);
         $display("Convolution engine passed %0d randomized layers", case_count);
         $finish;
     end
