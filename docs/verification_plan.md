@@ -27,3 +27,8 @@ folding, Conv/bias/ReLU fusion, shared-intermediate safety, static view
 canonicalization, backward-liveness cleanup, backend assignment, and the complete pass
 pipeline. Numerical checks directly compare unfused and folded arithmetic. The
 recommended two-convolution CNN is also imported and optimized end to end.
+
+Milestone 4 tests observed calibration ranges, activation and per-output-channel weight
+metadata, INT32 biases, bounded fixed-point multipliers, complete Conv/MaxPool/View/Gemm/
+Softmax execution, deterministic JSON reports, measured output error, optional labeled
+accuracy, and rejection of empty, non-finite, or incorrectly shaped samples.

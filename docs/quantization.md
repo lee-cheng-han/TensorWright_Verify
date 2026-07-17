@@ -28,3 +28,7 @@ hardware width for compiler-generated multipliers.
 The bit-accurate reference implementation is in `tensorwright.reference`. Convolution
 uses batch-one CHW activations and OIHW weights, explicit zero padding, positive integer
 strides, and per-output-channel bias, multiplier, and shift values.
+
+Milestone 4 calibration and graph quantization are specified in
+`quantized_compilation.md`. Calibration is data-dependent: reported ranges, errors, and
+accuracy values always come from the samples supplied to that compilation run.

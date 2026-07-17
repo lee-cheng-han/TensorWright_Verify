@@ -19,6 +19,10 @@ class OptimizationError(CompilerError):
     """Raised when an otherwise valid graph violates an optimization contract."""
 
 
+class QuantizationError(CompilerError):
+    """Raised when a graph cannot satisfy the quantized execution contract."""
+
+
 class UnsupportedOperatorError(CompilerError):
     """Raised when an ONNX node is outside the explicit MVP whitelist."""
 
