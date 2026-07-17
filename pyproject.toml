@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tensorwright"
+version = "0.0.0"
+description = "Hardware-aware machine-learning compiler and FPGA inference platform"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Hank Lee" }]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+tensorwright = "tensorwright.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tensorwright*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["tensorwright", "tests"]
