@@ -84,6 +84,64 @@ def _core_vectors(path: Path) -> int:
     return count
 
 
+def _convolution_vectors(path: Path) -> int:
+    random_source = random.Random(0xC07E)
+    case_count = 20
+    lines = [str(case_count)]
+    for _ in range(case_count):
+        biases = [random_source.randint(-500, 500) for _ in range(2)]
+        multipliers = [random_source.randint(1, 4) for _ in range(2)]
+        shifts = [random_source.randint(1, 4) for _ in range(2)]
+        relu = [bool(random_source.getrandbits(1)) for _ in range(2)]
+        weights = [random_source.randint(-8, 7) for _ in range(2 * 3 * 9)]
+        activations = [random_source.randint(-16, 15) for _ in range(3 * 5 * 5)]
+        expected: list[int] = []
+        for output_channel in range(2):
+            for output_y in range(3):
+                for output_x in range(3):
+                    accumulator = 0
+                    for input_channel in range(3):
+                        for kernel_y in range(3):
+                            for kernel_x in range(3):
+                                activation_index = (
+                                    input_channel * 25
+                                    + (output_y + kernel_y) * 5
+                                    + output_x
+                                    + kernel_x
+                                )
+                                weight_index = (
+                                    output_channel * 27
+                                    + input_channel * 9
+                                    + kernel_y * 3
+                                    + kernel_x
+                                )
+                                accumulator += (
+                                    activations[activation_index]
+                                    * weights[weight_index]
+                                )
+                    expected.append(
+                        requantize_int32(
+                            accumulator,
+                            biases[output_channel],
+                            multipliers[output_channel],
+                            shifts[output_channel],
+                            relu=relu[output_channel],
+                        )
+                    )
+        values = [
+            *biases,
+            *multipliers,
+            *shifts,
+            *[int(value) for value in relu],
+            *weights,
+            *activations,
+            *expected,
+        ]
+        lines.append(" ".join(str(value) for value in values))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return case_count
+
+
 def _build_and_run(
     top: str, sources: list[Path], vector_file: Path | None = None
 ) -> None:
@@ -118,8 +176,10 @@ def main() -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
     postprocess_file = BUILD / "postprocess_vectors.txt"
     core_file = BUILD / "core_vectors.txt"
+    convolution_file = BUILD / "convolution_vectors.txt"
     postprocess_count = _postprocess_vectors(postprocess_file)
     core_count = _core_vectors(core_file)
+    convolution_count = _convolution_vectors(convolution_file)
     _build_and_run(
         "tb_primitives",
         [
@@ -167,9 +227,21 @@ def main() -> int:
             VERIFICATION / "tb_control.sv",
         ],
     )
+    _build_and_run(
+        "tb_convolution_engine",
+        [
+            RTL / "compute" / "tensorwright_multiplier.sv",
+            RTL / "compute" / "tensorwright_adder_tree.sv",
+            RTL / "postprocess" / "tensorwright_postprocess.sv",
+            RTL / "compute" / "tensorwright_arithmetic_core.sv",
+            RTL / "engine" / "tensorwright_convolution_engine.sv",
+            VERIFICATION / "tb_convolution_engine.sv",
+        ],
+        convolution_file,
+    )
     print(
         f"RTL differential tests passed: postprocess={postprocess_count}, "
-        f"arithmetic_core={core_count}"
+        f"arithmetic_core={core_count}, convolution_layers={convolution_count}"
     )
     return 0
 

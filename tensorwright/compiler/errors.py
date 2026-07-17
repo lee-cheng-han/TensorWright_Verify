@@ -23,6 +23,10 @@ class QuantizationError(CompilerError):
     """Raised when a graph cannot satisfy the quantized execution contract."""
 
 
+class BundleValidationError(CompilerError):
+    """Raised when a deployment bundle violates its versioned contract."""
+
+
 class UnsupportedOperatorError(CompilerError):
     """Raised when an ONNX node is outside the explicit MVP whitelist."""
 

@@ -10,12 +10,14 @@ while reserving physical board deployment and measurements for a future extensio
 
 ## Status
 
-Milestone 7 provides the project specification, installable Python package, compiler,
+Milestone 9 provides the project specification, installable Python package, compiler,
 bit-accurate INT8 reference, quantized software execution, a synthesizable nine-lane
 RTL arithmetic core, and verified ready/valid streaming, FIFO, weight, activation, and
 3x3 window-buffer blocks, and a versioned AXI4-Lite control plane with interrupts,
-defined errors, and performance counters. The integrated convolution engine, runtime,
-deployment bundles, and hardware execution are not yet implemented.
+defined errors, performance counters, and an integrated multi-channel INT8 3x3
+convolution engine, deterministic scheduling and memory planning, and validated
+checksum-protected `.twmodel` deployment bundles. Runtime execution and physical
+hardware execution are not yet implemented.
 
 The current implementation does not claim RTL-simulated execution, physical FPGA
 execution, measured hardware speedup, board power, DMA latency, or ARM-to-FPGA

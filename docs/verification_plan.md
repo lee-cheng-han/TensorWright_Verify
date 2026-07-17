@@ -58,3 +58,15 @@ identity/version reads, undefined-address `DECERR`, invalid configuration errors
 write-one-to-clear IRQ state, soft reset, normal and premature completion, and exact
 activity/transfer/MAC counters. Completion is rejected unless the final configured
 output transfer has occurred.
+
+Milestone 8 differentially tests complete 5x5, three-input-channel, two-output-channel
+layers against Python-generated integer-reference vectors. Twenty fixed-seed randomized
+layers vary all activations, weights, biases, multipliers, shifts, and ReLU controls;
+randomized gaps and output backpressure exercise all three stream boundaries. Every one
+of the 360 output values and each packet-final marker must match exactly.
+
+Milestone 9 builds the same quantized graph twice and requires byte-identical bundle
+contents. Tests unpack command fields, inspect tensor and quantization sizes, load the
+validated metadata, and reject checksum corruption, incompatible versions, and invalid
+bundle paths. The validator also enforces required files, command-record boundaries,
+64-byte memory alignment, JSON schemas, and matching graph/schedule layer counts.

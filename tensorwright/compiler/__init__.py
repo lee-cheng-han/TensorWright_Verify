@@ -1,6 +1,13 @@
 """TensorWright compiler interfaces."""
 
+from tensorwright.compiler.backend import (
+    BundleContents,
+    build_bundle,
+    load_bundle,
+    validate_bundle,
+)
 from tensorwright.compiler.errors import (
+    BundleValidationError,
     CompilerError,
     ModelValidationError,
     OptimizationError,
@@ -20,6 +27,8 @@ from tensorwright.compiler.quantization import (
 
 __all__ = [
     "CompilerError",
+    "BundleContents",
+    "BundleValidationError",
     "Graph",
     "LayerSchedule",
     "ModelValidationError",
@@ -37,4 +46,7 @@ __all__ = [
     "compile_quantized",
     "execute_float",
     "execute_quantized",
+    "build_bundle",
+    "load_bundle",
+    "validate_bundle",
 ]

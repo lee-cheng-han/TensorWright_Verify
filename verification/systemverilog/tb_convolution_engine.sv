@@ -1,0 +1,87 @@
+`timescale 1ns/1ps
+`default_nettype none
+
+module tb_convolution_engine;
+    logic clk = 0, rst_n = 0, start = 0, soft_reset = 0;
+    always #5 clk = ~clk;
+    logic weight_valid, weight_ready, weight_last; logic signed [7:0] weight_data;
+    logic activation_valid, activation_ready, activation_last; logic signed [7:0] activation_data;
+    logic output_valid, output_ready, output_last; logic signed [7:0] output_data;
+    logic signed [1:0][31:0] biases; logic [1:0][30:0] multipliers;
+    logic [1:0][6:0] shifts; logic [1:0] relu;
+    logic busy, done, overflow, compute_active; logic [31:0] macs;
+    integer weights [0:53]; integer activations [0:74]; integer expected [0:17];
+
+    tensorwright_convolution_engine #(
+        .IMAGE_WIDTH(5), .IMAGE_HEIGHT(5), .INPUT_CHANNELS(3), .OUTPUT_CHANNELS(2)
+    ) dut (
+        .clk_i(clk), .rst_ni(rst_n), .start_i(start), .soft_reset_i(soft_reset),
+        .weight_tvalid_i(weight_valid), .weight_tready_o(weight_ready),
+        .weight_tdata_i(weight_data), .weight_tlast_i(weight_last),
+        .activation_tvalid_i(activation_valid), .activation_tready_o(activation_ready),
+        .activation_tdata_i(activation_data), .activation_tlast_i(activation_last),
+        .output_tvalid_o(output_valid), .output_tready_i(output_ready),
+        .output_tdata_o(output_data), .output_tlast_o(output_last),
+        .biases_i(biases), .multipliers_i(multipliers), .shifts_i(shifts), .relu_i(relu),
+        .busy_o(busy), .done_o(done), .overflow_o(overflow),
+        .compute_active_o(compute_active), .macs_executed_o(macs)
+    );
+
+    initial begin : test
+        integer file, scanned, case_count, case_index, index, sent, received, cycles;
+        integer bias_value, multiplier_value, shift_value, relu_value;
+        logic [31:0] lfsr; logic source_fire, sink_fire;
+        string vector_file;
+        if (!$value$plusargs("VECTOR_FILE=%s", vector_file)) $fatal(1, "VECTOR_FILE missing");
+        file = $fopen(vector_file, "r"); if (!file) $fatal(1, "cannot open vectors");
+        scanned = $fscanf(file, "%d", case_count);
+        weight_valid = 0; activation_valid = 0; output_ready = 0; weight_data = 0;
+        activation_data = 0; weight_last = 0; activation_last = 0;
+        repeat (3) @(posedge clk); rst_n = 1; @(posedge clk);
+        lfsr = 32'h243f6a88;
+        for (case_index = 0; case_index < case_count; case_index++) begin
+            for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", bias_value); biases[index] = bias_value; end
+            for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", multiplier_value); multipliers[index] = multiplier_value; end
+            for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", shift_value); shifts[index] = shift_value; end
+            for (index = 0; index < 2; index++) begin scanned = $fscanf(file, "%d", relu_value); relu[index] = relu_value; end
+            for (index = 0; index < 54; index++) scanned = $fscanf(file, "%d", weights[index]);
+            for (index = 0; index < 75; index++) scanned = $fscanf(file, "%d", activations[index]);
+            for (index = 0; index < 18; index++) scanned = $fscanf(file, "%d", expected[index]);
+            @(negedge clk); start = 1; @(posedge clk); #1; start = 0;
+
+            sent = 0; cycles = 0;
+            while (sent < 54) begin
+                @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
+                if (!weight_valid && lfsr[2]) begin weight_valid = 1; weight_data = 8'(weights[sent]); weight_last = sent == 53; end
+                #1; source_fire = weight_valid && weight_ready; @(posedge clk); #1;
+                if (source_fire) begin sent++; weight_valid = 0; end
+                cycles++; if (cycles > 2000) $fatal(1, "weight timeout");
+            end
+            sent = 0;
+            while (sent < 75) begin
+                @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
+                if (!activation_valid && lfsr[3]) begin activation_valid = 1; activation_data = 8'(activations[sent]); activation_last = sent == 74; end
+                #1; source_fire = activation_valid && activation_ready; @(posedge clk); #1;
+                if (source_fire) begin sent++; activation_valid = 0; end
+                cycles++; if (cycles > 4000) $fatal(1, "activation timeout");
+            end
+            received = 0;
+            while (received < 18) begin
+                @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
+                output_ready = lfsr[4] | lfsr[7]; #1; sink_fire = output_valid && output_ready;
+                if (sink_fire) begin
+                    if (output_data !== 8'(expected[received])) $fatal(1, "case %0d output %0d: got %0d expected %0d", case_index, received, output_data, expected[received]);
+                    if (output_last !== (received == 17)) $fatal(1, "TLAST mismatch");
+                end
+                @(posedge clk); #1; if (sink_fire) received++;
+                cycles++; if (cycles > 8000) $fatal(1, "output timeout");
+            end
+            if (!done || busy || overflow) $fatal(1, "completion state mismatch");
+        end
+        $fclose(file);
+        $display("Convolution engine passed %0d randomized layers", case_count);
+        $finish;
+    end
+endmodule
+
+`default_nettype wire

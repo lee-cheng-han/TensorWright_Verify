@@ -47,7 +47,9 @@ lint-rtl:
 		rtl/memory/tensorwright_window_generator_3x3.sv \
 		rtl/control/tensorwright_registers_pkg.sv \
 		rtl/interfaces/tensorwright_axil_if.sv \
-		rtl/control/tensorwright_control.sv
+		rtl/control/tensorwright_control.sv \
+		rtl/engine/tensorwright_convolution_engine.sv \
+		rtl/tensorwright_top.sv
 
 test-rtl:
 	$(PYTHON) -m scripts.run_verilator_tests
