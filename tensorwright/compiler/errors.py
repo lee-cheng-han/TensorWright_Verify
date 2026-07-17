@@ -15,6 +15,10 @@ class StaticShapeError(CompilerError):
     """Raised when a tensor does not have a fully known static shape."""
 
 
+class OptimizationError(CompilerError):
+    """Raised when an otherwise valid graph violates an optimization contract."""
+
+
 class UnsupportedOperatorError(CompilerError):
     """Raised when an ONNX node is outside the explicit MVP whitelist."""
 

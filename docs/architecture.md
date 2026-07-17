@@ -16,8 +16,9 @@ a particular network.
 
 Correctness advances in this order: specification, bit-accurate software reference,
 compiler, RTL units, integrated RTL, and finally hardware. Performance work follows a
-correct end-to-end path. Milestone 0 defines contracts only; no compiler or accelerator
-functionality is claimed.
+correct end-to-end path. The current compiler validates and imports static ONNX graphs,
+then applies conservative, deterministic graph transformations. It does not yet emit a
+quantized model, schedule, deployment bundle, or accelerator commands.
 
 The primary target is a Digilent Zybo Z7-20 (Zynq-7020). Planned board integration uses
 AXI4-Lite for control, AXI Stream for payloads, and AXI DMA where appropriate. Linux on

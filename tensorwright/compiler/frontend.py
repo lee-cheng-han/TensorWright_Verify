@@ -142,8 +142,11 @@ def _read_tensors(model: ModelProto) -> dict[str, Tensor]:
 
 def _read_operations(model: ModelProto) -> list[Operation]:
     operations: list[Operation] = []
+    used_names: set[str] = set()
     for index, node in enumerate(model.graph.node):
-        name = node.name or f"{node.op_type.lower()}_{index}"
+        base_name = node.name or f"{node.op_type.lower()}_{index}"
+        name = _unique_operation_name(base_name, used_names)
+        used_names.add(name)
         if (
             node.domain not in {"", "ai.onnx"}
             or node.op_type not in SUPPORTED_OPERATORS
@@ -167,6 +170,15 @@ def _read_operations(model: ModelProto) -> list[Operation]:
             )
         )
     return operations
+
+
+def _unique_operation_name(base: str, used_names: set[str]) -> str:
+    if base not in used_names:
+        return base
+    suffix = 1
+    while f"{base}_{suffix}" in used_names:
+        suffix += 1
+    return f"{base}_{suffix}"
 
 
 def _validate_operator_whitelist(model: ModelProto) -> None:

@@ -21,3 +21,9 @@ The frontend runs the ONNX checker before and after strict shape inference. Ever
 tensor consumed or produced by a supported node must have a positive, fully static
 shape. Initializers become constant tensors with JSON-compatible data. ONNX protocol
 objects do not remain in the resulting IR.
+
+Optimization passes preserve operation order, rebuild producer-consumer links, and
+return deep-copied graphs. Fused operation names remain on the surviving operation for
+diagnostics. Static Flatten and Reshape operations canonicalize to the internal `View`
+operation; this internal type is not accepted directly from ONNX. See
+`optimization_passes.md` for pass order and eligibility rules.

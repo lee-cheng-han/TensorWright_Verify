@@ -22,7 +22,12 @@ subset uses 1x1 or 3x3 kernels, stride one or two, and static zero padding. Dyna
 shapes, recurrent networks, attention, transformers, training, and floating-point RTL
 are outside MVP scope.
 
-Milestone 2 accepts the whitelist at import time but does not yet prove operation-level
-restrictions such as convolution kernel sizes or whether every `Add` is a bias add.
-Those semantic checks and transformations belong to the optimization milestone. Nodes
-in custom domains are rejected even when their short operation name matches the list.
+The frontend accepts the whitelist at import time. Milestone 3 folds an `Add` only when
+it is a constant channel bias immediately following a single-consumer Conv, with bias
+layout `[C]` or `[1,C,1,1]`. Other `Add` nodes remain visible and compiler-assigned; no
+later execution support is claimed for them yet. BatchNormalization similarly remains
+visible unless every parameter is constant and its Conv producer is safe to rewrite.
+
+Operation-level validation such as convolution kernel and stride restrictions remains
+future work. Nodes in custom domains are rejected even when their short operation name
+matches the whitelist.

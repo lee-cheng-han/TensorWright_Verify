@@ -21,3 +21,9 @@ Milestone 2 tests ONNX file loading, checker failures, strict static-shape enfor
 opset capture, attribute and initializer extraction, producer-consumer relationships,
 explicit unsupported-operation errors, and deterministic IR serialization. Models are
 constructed in memory by the tests so fixtures remain small and reviewable.
+
+Milestone 3 adds before-and-after tests for constant folding, BatchNormalization
+folding, Conv/bias/ReLU fusion, shared-intermediate safety, static view
+canonicalization, backward-liveness cleanup, backend assignment, and the complete pass
+pipeline. Numerical checks directly compare unfused and folded arithmetic. The
+recommended two-convolution CNN is also imported and optimized end to end.

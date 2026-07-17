@@ -14,6 +14,7 @@ from tensorwright.compiler import (
     UnsupportedOperatorError,
     import_onnx_model,
     load_onnx,
+    optimize_graph,
 )
 
 
@@ -109,6 +110,20 @@ class OnnxFrontendTest(unittest.TestCase):
         self.assertEqual(graph.tensors["output"].shape, [1, 10])
         self.assertEqual(graph.operations[-1].name, "softmax_8")
 
+    def test_recommended_mvp_cnn_optimizes_into_execution_groups(self) -> None:
+        optimized = optimize_graph(import_onnx_model(_mvp_cnn_model()))
+
+        self.assertEqual(
+            [operation.operation_type for operation in optimized.operations],
+            ["Conv", "MaxPool", "Conv", "MaxPool", "View", "Gemm", "Softmax"],
+        )
+        self.assertEqual(optimized.operations[0].fused_operations, ["relu_1"])
+        self.assertEqual(optimized.operations[2].fused_operations, ["relu_4"])
+        self.assertEqual(
+            [operation.assigned_backend for operation in optimized.operations],
+            ["fpga", "arm", "fpga", "arm", "metadata", "arm", "arm"],
+        )
+
     def test_import_builds_typed_graph_and_relationships(self) -> None:
         graph = import_onnx_model(_conv_relu_model())
 
@@ -142,6 +157,25 @@ class OnnxFrontendTest(unittest.TestCase):
         document = json.loads(first)
         self.assertEqual(document["operations"][0]["operation_type"], "Conv")
         self.assertEqual(document["tensors"]["weights"]["shape"], [1, 1, 1, 1])
+
+    def test_duplicate_source_node_names_receive_unique_ir_names(self) -> None:
+        model_input = helper.make_tensor_value_info("input", TensorProto.FLOAT, [1])
+        model_output = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1])
+        model = _model(
+            [
+                helper.make_node("Relu", ["input"], ["middle"], name="duplicate"),
+                helper.make_node("Relu", ["middle"], ["output"], name="duplicate"),
+            ],
+            [model_input],
+            [model_output],
+        )
+
+        graph = import_onnx_model(model)
+
+        self.assertEqual(
+            [operation.name for operation in graph.operations],
+            ["duplicate", "duplicate_1"],
+        )
 
     def test_loads_model_from_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
