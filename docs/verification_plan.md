@@ -52,3 +52,9 @@ The self-checking Verilator test proves ordered delivery of 40 FIFO items, addre
 delivery of 16 weights, and exact lane packing and `tlast` placement for all nine
 windows of a 5x5 raster. Inline assertions enforce stable stalled outputs, bounded FIFO
 occupancy, known accepted inputs, and correctly placed image `tlast`.
+
+Milestone 7 performs register transactions through the AXI4-Lite channels and checks
+identity/version reads, undefined-address `DECERR`, invalid configuration errors,
+write-one-to-clear IRQ state, soft reset, normal and premature completion, and exact
+activity/transfer/MAC counters. Completion is rejected unless the final configured
+output transfer has occurred.

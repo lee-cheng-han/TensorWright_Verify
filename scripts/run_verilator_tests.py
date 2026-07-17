@@ -159,6 +159,14 @@ def main() -> int:
             VERIFICATION / "tb_streaming.sv",
         ],
     )
+    _build_and_run(
+        "tb_control",
+        [
+            RTL / "control" / "tensorwright_registers_pkg.sv",
+            RTL / "control" / "tensorwright_control.sv",
+            VERIFICATION / "tb_control.sv",
+        ],
+    )
     print(
         f"RTL differential tests passed: postprocess={postprocess_count}, "
         f"arithmetic_core={core_count}"
