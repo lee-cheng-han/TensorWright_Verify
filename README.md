@@ -22,12 +22,16 @@ TensorWright does not position itself as a replacement for FINN or hls4ml.
 - Optional operation-output traces from the quantized Python reference
 - Optional RTL output-transfer traces with cycle, ready/valid, sequence, and TLAST metadata
 - `tensorwright trace inspect` trace summaries
+- Semantic trace alignment and deterministic first-divergence reports
+- Versioned numerical diagnosis rules with evidence and confidence
 
 The supported canonical trace sources are the quantized Python reference and the custom
 TensorWright RTL output stream. The self-checking Verilator regression produces a real RTL
-trace; the simulator-independent capture API is also suitable for Cocotb monitors. Semantic
-alignment and first-divergence detection begin in Milestone 13. FINN and hls4ml adapters are
-planned only; no compatibility is claimed.
+trace; the simulator-independent capture API is also suitable for Cocotb monitors. The
+comparison engine aligns scalar and chunked payloads across these backends and reports the
+first missing, unexpected, structurally incompatible, or unequal value. Deterministic rules
+classify supported numerical patterns without claiming protocol causes. FINN and hls4ml
+adapters are planned only; no compatibility is claimed.
 
 ## Planned verification workflow
 
@@ -47,7 +51,7 @@ Reference: -38    Hardware: -36    Cycle: 18,302
 Likely cause: requantization rounding mismatch
 ```
 
-Trace comparison, diagnosis, minimization, regression generation, and dashboards are
+Numerical and protocol diagnosis, minimization, regression generation, and dashboards are
 planned milestones, not current product claims.
 
 ## Development
@@ -68,11 +72,14 @@ Existing simulation compatibility is preserved:
 ```bash
 tensorwright simulate model_name.twmodel --seed 32325
 tensorwright trace inspect traces/reference.jsonl
+tensorwright trace compare traces/reference.jsonl traces/rtl.jsonl --report report.json
+tensorwright trace diagnose traces/reference.jsonl traces/rtl.jsonl --report diagnosis.json
 ```
 
 See the [migration assessment](docs/migration_to_verify.md),
-[architecture](docs/architecture.md), [trace format](docs/trace_format.md), and
-[roadmap](docs/roadmap.md).
+[architecture](docs/architecture.md), [trace format](docs/trace_format.md),
+[trace comparison](docs/trace_comparison.md), [numerical diagnosis](docs/numerical_diagnosis.md),
+and [roadmap](docs/roadmap.md).
 
 ## License
 

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from tensorwright.reference import requantize_int32
 from tensorwright.trace.adapters.rtl import RtlTraceCapture, read_transfer_log
+from tensorwright.trace.compare import compare_trace_files
+from tensorwright.trace.schema import TRACE_VERSION, TraceEvent, write_trace
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build" / "rtl_vectors"
@@ -85,11 +87,12 @@ def _core_vectors(path: Path) -> int:
     return count
 
 
-def _convolution_vectors(path: Path) -> int:
+def _convolution_vectors(path: Path) -> tuple[int, list[int]]:
     random_source = random.Random(0xC07E)
     case_count = 20
     lines = [str(case_count)]
-    for _ in range(case_count):
+    first_expected: list[int] = []
+    for case_index in range(case_count):
         biases = [random_source.randint(-500, 500) for _ in range(2)]
         multipliers = [random_source.randint(1, 4) for _ in range(2)]
         shifts = [random_source.randint(1, 4) for _ in range(2)]
@@ -139,8 +142,41 @@ def _convolution_vectors(path: Path) -> int:
             *expected,
         ]
         lines.append(" ".join(str(value) for value in values))
+        if case_index == 0:
+            first_expected = expected
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return case_count
+    return case_count, first_expected
+
+
+def _reference_convolution_trace(path: Path, values: list[int]) -> Path:
+    events = []
+    for sequence, value in enumerate(values):
+        output_channel, remainder = divmod(sequence, 9)
+        output_y, output_x = divmod(remainder, 3)
+        events.append(
+            TraceEvent(
+                trace_version=TRACE_VERSION,
+                event_type="scalar",
+                run_id="python_convolution_case_0000",
+                source_backend="tensorwright.python_reference",
+                model_id="rtl_convolution_regression",
+                source_operation_id="synthetic:conv_0",
+                compiled_operation_id="compiled:op_0000",
+                fused_source_operation_ids=[],
+                graph_stage="post_quantization",
+                operation_name="conv_0",
+                operation_type="Conv",
+                hardware_stage="software_operation_output",
+                trace_point="operation_output",
+                tensor_name="conv_0_output",
+                shape=[1, 2, 3, 3],
+                layout="NCHW",
+                dtype="int8",
+                value=value,
+                coordinate=[0, output_channel, output_y, output_x],
+            )
+        )
+    return write_trace(path, events)
 
 
 def _build_and_run(
@@ -184,7 +220,9 @@ def main() -> int:
     convolution_file = BUILD / "convolution_vectors.txt"
     postprocess_count = _postprocess_vectors(postprocess_file)
     core_count = _core_vectors(core_file)
-    convolution_count = _convolution_vectors(convolution_file)
+    convolution_count, first_convolution_expected = _convolution_vectors(
+        convolution_file
+    )
     rtl_transfer_file = BUILD / "convolution_rtl_transfers.txt"
     _build_and_run(
         "tb_primitives",
@@ -260,10 +298,20 @@ def main() -> int:
     for transfer in read_transfer_log(rtl_transfer_file):
         capture.record(transfer)
     trace_path = capture.write(BUILD / "convolution_rtl_trace.jsonl")
+    assert trace_path is not None
+    reference_trace_path = _reference_convolution_trace(
+        BUILD / "convolution_reference_trace.jsonl", first_convolution_expected
+    )
+    comparison = compare_trace_files(reference_trace_path, trace_path)
+    if not comparison.matched:
+        raise RuntimeError(f"RTL trace comparison failed: {comparison.to_json()}")
+    comparison_path = BUILD / "convolution_comparison_report.json"
+    comparison_path.write_text(comparison.to_json(), encoding="utf-8")
     print(
         f"RTL differential tests passed: postprocess={postprocess_count}, "
         f"arithmetic_core={core_count}, convolution_layers={convolution_count}, "
-        f"rtl_trace={trace_path}"
+        f"aligned_trace_values={comparison.matched_values}, "
+        f"comparison_report={comparison_path}"
     )
     return 0
 

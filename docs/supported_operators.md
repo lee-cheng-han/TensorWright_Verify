@@ -34,6 +34,6 @@ matches the whitelist.
 
 Under TensorWright Verify, operator support has three separate meanings: the Python
 reference can produce semantic traces, the custom RTL can expose a corresponding stage,
-and the future alignment engine can compare them. Current M11 trace generation covers
-outputs executable by the quantized Python backend. This does not imply an RTL trace
-point or cross-backend alignment exists yet.
+and the alignment engine can compare them. Current trace generation covers outputs
+executable by the quantized Python backend and the custom convolution RTL output stream.
+Other operator stages do not imply an RTL trace point or cross-backend alignment yet.

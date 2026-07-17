@@ -10,9 +10,9 @@ the command-driven simulation runtime.
 | 0–10 | Original compiler, numerical, RTL, bundle, and runtime foundation | Complete |
 | 11 | Product migration and canonical trace specification | Complete |
 | 12 | Python-reference and RTL trace capture | Complete |
-| 13 | Semantic alignment and first-divergence detection | Next |
-| 14 | Deterministic numerical diagnosis rules | Planned |
-| 15 | Streaming and protocol diagnosis | Planned |
+| 13 | Semantic alignment and first-divergence detection | Complete |
+| 14 | Deterministic numerical diagnosis rules | Complete |
+| 15 | Streaming and protocol diagnosis | Next |
 | 16 | Deterministic failing-input minimization | Planned |
 | 17 | Cocotb regression-test generation | Planned |
 | 18 | Debugging dashboard | Planned |
@@ -25,3 +25,12 @@ output-stream transfers from the custom RTL. The simulator-independent adapter i
 from Cocotb; the Verilator regression emits the same compact samples and converts them to
 canonical JSONL. Capture is intentionally limited to the stable convolution output boundary.
 It does not implement alignment or diagnosis.
+
+Milestone 13 aligns operation outputs with RTL stream transfers by stable primary source ID,
+tensor, semantic trace point, and coordinate. It expands chunk payloads, rejects ambiguity,
+and reports the first value or structural divergence. It does not assign a likely cause.
+
+Milestone 14 adds a versioned, deterministic numerical ruleset for accumulator, bias,
+activation, saturation, requantization, and output-only mismatches. Every classification
+includes confidence, evidence, and recommended checks. Structural transfer failures are
+explicitly left unclassified for Milestone 15.

@@ -14,9 +14,10 @@ ONNX or QONNX model
                                                                          -> regression
 ```
 
-Milestones 11 and 12 implement the canonical trace contract, Python-reference writer,
-and accepted-transfer capture at the convolution RTL output. Alignment and debugging
-stages follow in Milestone 13 and later.
+Milestones 11–14 implement the canonical trace contract, Python-reference writer,
+accepted-transfer capture at the convolution RTL output, semantic alignment, and first-
+divergence detection, plus deterministic numerical diagnosis. Protocol diagnosis and later
+debugging stages follow in Milestone 15 onward.
 
 ## Preserved supporting infrastructure
 
