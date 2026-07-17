@@ -12,6 +12,16 @@ from tensorwright.trace.diagnosis import (
     DiagnosisReport,
     diagnose_comparison,
 )
+from tensorwright.trace.plugins import (
+    ADAPTER_API_VERSION,
+    ENTRY_POINT_GROUP,
+    AdapterDescriptor,
+    AdapterError,
+    AdapterRegistry,
+    AdapterRequest,
+    TraceAdapter,
+    default_adapter_registry,
+)
 from tensorwright.trace.protocol import (
     PROTOCOL_RULESET_VERSION,
     ProtocolFinding,
@@ -31,6 +41,12 @@ from tensorwright.trace.schema import (
 
 __all__ = [
     "TRACE_VERSION",
+    "ADAPTER_API_VERSION",
+    "ENTRY_POINT_GROUP",
+    "AdapterDescriptor",
+    "AdapterError",
+    "AdapterRegistry",
+    "AdapterRequest",
     "AlignmentError",
     "ComparisonReport",
     "DIAGNOSIS_RULESET_VERSION",
@@ -44,9 +60,11 @@ __all__ = [
     "TraceError",
     "TraceEvent",
     "TraceSet",
+    "TraceAdapter",
     "read_trace",
     "compare_trace_files",
     "diagnose_comparison",
+    "default_adapter_registry",
     "analyze_protocol_files",
     "write_reference_trace",
     "write_trace",

@@ -100,7 +100,7 @@ class MinimizationResult:
         report = Path(report_path)
         output.parent.mkdir(parents=True, exist_ok=True)
         report.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(output, **self.inputs)
+        np.savez(output, **self.inputs)  # type: ignore[arg-type]
         report.write_text(self.report_json(), encoding="utf-8")
 
 

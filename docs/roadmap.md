@@ -15,9 +15,9 @@ the command-driven simulation runtime.
 | 15 | Streaming and protocol diagnosis | Complete |
 | 16 | Deterministic failing-input minimization | Complete |
 | 17 | Cocotb regression-test generation | Complete |
-| 18 | Debugging dashboard | Next |
-| 19 | Trace-adapter plugin API | Planned |
-| 20 | Real tested FINN adapter | Future |
+| 18 | Debugging dashboard | Complete |
+| 19 | Trace-adapter plugin API | Complete |
+| 20 | Real tested FINN adapter | Complete |
 | 21 | Real tested hls4ml adapter | Future |
 
 Milestone 12 adds optional operation-output traces from the Python reference and accepted
@@ -49,3 +49,20 @@ Milestone 17 packages minimized NPZ inputs, canonical reference traces and paylo
 preserved failure identity, a checksummed manifest, and a portable Cocotb test. A small
 `module:function` adapter hook drives project-specific DUT interfaces while the generated
 test reuses TensorWright semantic comparison. Dashboard work begins in Milestone 18.
+
+Milestone 18 adds deterministic, self-contained HTML debugging dashboards combining trace
+counts, the first divergence, numerical diagnosis, protocol findings, complete embedded JSON,
+and optional minimization and regression metadata. Reports require no server or JavaScript and
+are suitable for local inspection or CI artifacts. The adapter plugin API begins in Milestone 19.
+
+Milestone 19 adds trace-adapter API version 1, validated descriptors, isolated registries,
+opt-in Python entry-point discovery, canonical-output enforcement, and CLI listing/conversion.
+The maintained Verilator transfer-log converter is the first built-in implementation. External
+backends remain unsupported until their separately tested adapter milestones are completed.
+
+Milestone 20 adds the maintained `finn.dataflow` converter for FINN full execution-context
+NPZ artifacts. Explicit tensor mappings preserve source and compiled operation provenance;
+small tensors use scalar events and larger tensors use external NumPy payloads. A repository
+integration script invokes FINN's real full-context executor and verifies converted values.
+The adapter does not infer cycles or streaming handshakes absent from FINN's context. The
+real tested hls4ml adapter begins in Milestone 21.

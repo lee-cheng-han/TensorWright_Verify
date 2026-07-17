@@ -14,6 +14,7 @@ import numpy as np
 
 from tensorwright import __version__
 from tensorwright.compiler import CompilerError
+from tensorwright.dashboard import DashboardError, generate_dashboard
 from tensorwright.minimizer import FailureSignature, MinimizationError, minimize_inputs
 from tensorwright.regression import (
     RegressionGenerationError,
@@ -21,12 +22,15 @@ from tensorwright.regression import (
 )
 from tensorwright.runtime import SimulationConfig, SimulationError, simulate_bundle
 from tensorwright.trace import (
+    AdapterError,
+    AdapterRequest,
     ComparisonReport,
     DiagnosisReport,
     ProtocolReport,
     TraceError,
     analyze_protocol_files,
     compare_trace_files,
+    default_adapter_registry,
     diagnose_comparison,
     read_trace,
 )
@@ -78,6 +82,14 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("reference_trace", help="canonical minimized reference trace")
     generate.add_argument("output", help="new or empty output directory")
     generate.add_argument("--name", required=True, help="portable test identifier")
+    dashboard = subparsers.add_parser(
+        "dashboard", help="generate a self-contained HTML debugging report"
+    )
+    dashboard.add_argument("reference", help="canonical software-reference trace")
+    dashboard.add_argument("candidate", help="canonical RTL or HLS candidate trace")
+    dashboard.add_argument("output", help="destination .html report")
+    dashboard.add_argument("--minimization-report", help="optional minimizer JSON")
+    dashboard.add_argument("--regression-manifest", help="optional regression manifest")
     trace = subparsers.add_parser("trace", help="inspect canonical verification traces")
     trace_commands = trace.add_subparsers(dest="trace_command", required=True)
     inspect = trace_commands.add_parser(
@@ -111,6 +123,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print the machine-readable protocol report"
     )
     protocol.add_argument("--report", help="also write the JSON report to this path")
+    adapters = trace_commands.add_parser(
+        "adapters", help="list registered canonical trace adapters"
+    )
+    adapters.add_argument(
+        "--discover",
+        action="store_true",
+        help="load installed third-party entry points",
+    )
+    convert = trace_commands.add_parser(
+        "convert", help="convert a backend artifact to canonical JSONL"
+    )
+    convert.add_argument("source", help="adapter-specific source artifact")
+    convert.add_argument("output", help="destination canonical .jsonl trace")
+    convert.add_argument("--adapter", required=True, help="registered adapter name")
+    convert.add_argument(
+        "--options",
+        default="{}",
+        help="JSON object or @path containing adapter-specific options",
+    )
+    convert.add_argument(
+        "--discover",
+        action="store_true",
+        help="load installed third-party entry points",
+    )
     return parser
 
 
@@ -119,7 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     if arguments.command == "simulate":
         try:
-            result = simulate_bundle(
+            simulation_result = simulate_bundle(
                 arguments.bundle,
                 config=SimulationConfig(
                     seed=arguments.seed,
@@ -130,8 +166,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (CompilerError, SimulationError, ValueError) as error:
             print(f"tensorwright: simulation failed: {error}", file=sys.stderr)
             return 1
-        print(result.to_json(), end="")
-        return 0 if result.reference_match else 2
+        print(simulation_result.to_json(), end="")
+        return 0 if simulation_result.reference_match else 2
     if arguments.command == "minimize":
         try:
             input_path = Path(arguments.input)
@@ -150,7 +186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 candidate_path = Path(directory) / "candidate.npz"
 
                 def oracle(candidate: dict[str, np.ndarray]) -> FailureSignature | None:
-                    np.savez(candidate_path, **candidate)
+                    np.savez(candidate_path, **candidate)  # type: ignore[arg-type]
                     try:
                         completed = subprocess.run(
                             [*arguments.oracle, str(candidate_path)],
@@ -177,7 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         )
                     return FailureSignature.from_dict(payload)
 
-                result = minimize_inputs(
+                minimization_result = minimize_inputs(
                     inputs,
                     oracle,
                     max_evaluations=arguments.max_evaluations,
@@ -187,7 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if arguments.report
                 else output_path.with_suffix(".report.json")
             )
-            result.write(output_path, report_path)
+            minimization_result.write(output_path, report_path)
         except (
             MinimizationError,
             OSError,
@@ -196,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) as error:
             print(f"tensorwright: minimization failed: {error}", file=sys.stderr)
             return 1
-        print(result.report_json(), end="")
+        print(minimization_result.report_json(), end="")
         return 0
     if arguments.command == "generate-regression":
         try:
@@ -215,6 +251,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Generated Cocotb regression: {package.path}")
         print(f"Test module: {package.test_path.name}")
         return 0
+    if arguments.command == "dashboard":
+        try:
+            dashboard_result = generate_dashboard(
+                arguments.reference,
+                arguments.candidate,
+                arguments.output,
+                minimization_report=arguments.minimization_report,
+                regression_manifest=arguments.regression_manifest,
+            )
+        except (DashboardError, TraceError, OSError, ValueError) as error:
+            print(
+                f"tensorwright: dashboard generation failed: {error}", file=sys.stderr
+            )
+            return 1
+        print(f"Generated TensorWright dashboard: {dashboard_result.path}")
+        return 0 if dashboard_result.comparison.matched else 2
     if arguments.command == "trace" and arguments.trace_command == "inspect":
         try:
             trace_set = read_trace(arguments.path)
@@ -285,6 +337,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             _print_protocol_report(protocol_report)
         return 0 if protocol_report.protocol_ok else 2
+    if arguments.command == "trace" and arguments.trace_command == "adapters":
+        try:
+            registry = default_adapter_registry(discover=arguments.discover)
+        except AdapterError as error:
+            print(f"tensorwright: adapter discovery failed: {error}", file=sys.stderr)
+            return 1
+        print("TensorWright trace adapters")
+        for descriptor in registry.descriptors():
+            print(
+                f"{descriptor.name} {descriptor.version} (API {descriptor.api_version})"
+            )
+            print(f"  Inputs: {', '.join(descriptor.input_formats)}")
+            print(f"  Trace points: {', '.join(descriptor.trace_points)}")
+            print(f"  {descriptor.description}")
+        return 0
+    if arguments.command == "trace" and arguments.trace_command == "convert":
+        try:
+            options_text = arguments.options
+            if options_text.startswith("@"):
+                options_text = Path(options_text[1:]).read_text(encoding="utf-8")
+            options = json.loads(options_text)
+            if not isinstance(options, dict):
+                raise AdapterError("Adapter options must be a JSON object")
+            registry = default_adapter_registry(discover=arguments.discover)
+            converted = registry.convert(
+                arguments.adapter,
+                AdapterRequest(Path(arguments.source), Path(arguments.output), options),
+            )
+        except (AdapterError, OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"tensorwright: trace conversion failed: {error}", file=sys.stderr)
+            return 1
+        print(f"Generated canonical trace: {converted}")
+        return 0
     return 0
 
 

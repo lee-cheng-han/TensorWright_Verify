@@ -84,5 +84,6 @@ reference and RTL trace capture, semantic alignment, first-divergence localizati
 deterministic diagnosis-rule fixtures, explicit fault injection, minimizer preservation
 tests, and generated regression portability. Milestones 11–16 now cover schema validation,
 reference and RTL trace capture, comparison, numerical and protocol diagnosis, deterministic
-failure-preserving minimization, and portable Cocotb regression generation. Dashboard and later
-capabilities must not be inferred from the presence of schema fields.
+failure-preserving minimization, portable Cocotb regression generation, and deterministic offline
+dashboards, and a validated adapter registry. FINN, hls4ml, and other backend compatibility must
+not be inferred until a real adapter is installed and tested against that backend.

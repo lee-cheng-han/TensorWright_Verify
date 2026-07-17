@@ -27,14 +27,16 @@ TensorWright does not position itself as a replacement for FINN or hls4ml.
 - Streaming and packetization diagnosis with stable protocol rule IDs
 - Failure-signature-preserving minimization for named tensor inputs
 - Deterministic Cocotb regression packages generated from minimized failures
+- Self-contained HTML debugging dashboards for local and CI artifacts
+- Versioned trace-adapter registry with opt-in third-party discovery
 
 The supported canonical trace sources are the quantized Python reference and the custom
 TensorWright RTL output stream. The self-checking Verilator regression produces a real RTL
 trace; the simulator-independent capture API is also suitable for Cocotb monitors. The
 comparison engine aligns scalar and chunked payloads across these backends and reports the
 first missing, unexpected, structurally incompatible, or unequal value. Deterministic rules
-classify supported numerical patterns without claiming protocol causes. FINN and hls4ml
-adapters are planned only; no compatibility is claimed. A separate protocol analyzer checks
+classify supported numerical patterns without claiming protocol causes. A real-tested FINN
+full execution-context adapter is maintained; hls4ml remains planned only. A separate protocol analyzer checks
 ready/valid acceptance, transfer order, cycle order, packet boundaries, and transfer counts.
 
 ## Planned verification workflow
@@ -82,13 +84,19 @@ tensorwright trace diagnose-protocol traces/reference.jsonl traces/rtl.jsonl
 tensorwright minimize failing.npz minimal.npz --oracle python verify_failure.py
 tensorwright generate-regression minimal.npz minimal.report.json reference.jsonl \
   regressions/conv_rounding --name conv_rounding
+tensorwright dashboard traces/reference.jsonl traces/rtl.jsonl report.html
+tensorwright trace adapters
+tensorwright trace convert transfers.txt rtl.jsonl \
+  --adapter tensorwright.verilator_rtl --options @adapter-options.json
 ```
 
 See the [migration assessment](docs/migration_to_verify.md),
 [architecture](docs/architecture.md), [trace format](docs/trace_format.md),
 [trace comparison](docs/trace_comparison.md), [numerical diagnosis](docs/numerical_diagnosis.md),
 [protocol diagnosis](docs/protocol_diagnosis.md), [input minimization](docs/input_minimization.md),
-[regression generation](docs/regression_generation.md), and [roadmap](docs/roadmap.md).
+[regression generation](docs/regression_generation.md), [debugging dashboard](docs/dashboard.md),
+[trace adapter API](docs/trace_adapter_api.md), [FINN adapter](docs/finn_adapter.md),
+and [roadmap](docs/roadmap.md).
 
 ## License
 
