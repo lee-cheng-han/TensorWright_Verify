@@ -118,6 +118,10 @@ class OnnxFrontendTest(unittest.TestCase):
             ["Conv", "MaxPool", "Conv", "MaxPool", "View", "Gemm", "Softmax"],
         )
         self.assertEqual(optimized.operations[0].fused_operations, ["relu_1"])
+        self.assertEqual(optimized.operations[0].source_operation_id, "onnx:Conv:0")
+        self.assertEqual(
+            optimized.operations[0].fused_source_operation_ids, ["onnx:Relu:1"]
+        )
         self.assertEqual(optimized.operations[2].fused_operations, ["relu_4"])
         self.assertEqual(
             [operation.assigned_backend for operation in optimized.operations],
@@ -136,6 +140,8 @@ class OnnxFrontendTest(unittest.TestCase):
         self.assertEqual(graph.operations[0].attributes, {"strides": [1, 1]})
         self.assertTrue(graph.operations[0].hardware_supported)
         self.assertEqual(graph.operations[0].assigned_backend, "fpga")
+        self.assertEqual(graph.operations[0].source_operation_id, "onnx:Conv:0")
+        self.assertEqual(graph.operations[1].source_operation_id, "onnx:Relu:1")
 
         self.assertEqual(graph.tensors["input"].shape, [1, 1, 2, 2])
         self.assertEqual(graph.tensors["input"].layout, "NCHW")

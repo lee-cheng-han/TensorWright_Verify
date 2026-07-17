@@ -34,6 +34,10 @@ class FuseConvBiasRelu:
                 convolution.outputs = list(relu.outputs)
                 convolution.attributes["relu"] = True
                 convolution.fused_operations.append(relu.name)
+                if relu.source_operation_id is not None:
+                    convolution.fused_source_operation_ids.append(
+                        relu.source_operation_id
+                    )
                 result.operations.remove(relu)
                 rebuild_links(result)
         return result
@@ -101,6 +105,8 @@ class FuseConvBiasRelu:
         convolution.inputs = [convolution.inputs[0], convolution.inputs[1], bias_name]
         convolution.outputs = list(add.outputs)
         convolution.fused_operations.append(add.name)
+        if add.source_operation_id is not None:
+            convolution.fused_source_operation_ids.append(add.source_operation_id)
         return True
 
 

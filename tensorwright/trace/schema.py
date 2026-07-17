@@ -1,15 +1,25 @@
-"""Version-1 canonical JSON Lines trace schema."""
+"""Version-2 canonical JSON Lines trace schema."""
 
 from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-TRACE_VERSION = 1
-SUPPORTED_BACKENDS = {"python_reference", "cocotb_rtl", "custom_rtl"}
+TRACE_VERSION = 2
+BACKEND_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)+$")
+TRACE_POINTS = {
+    "operation_input",
+    "accumulator",
+    "post_bias",
+    "post_requantization",
+    "post_activation",
+    "operation_output",
+    "stream_transfer",
+}
 
 
 class TraceError(ValueError):
@@ -35,19 +45,27 @@ class QuantizationMetadata:
 @dataclass(frozen=True)
 class TraceEvent:
     trace_version: int
+    event_type: str
     run_id: str
     source_backend: str
     model_id: str
-    operation_id: str
+    source_operation_id: str
+    compiled_operation_id: str
+    fused_source_operation_ids: list[str]
+    graph_stage: str
     operation_name: str
     operation_type: str
     hardware_stage: str
+    trace_point: str
     tensor_name: str
-    coordinate: list[int]
     shape: list[int]
     layout: str
     dtype: str
-    value: int | float
+    value: int | float | None = None
+    coordinate: list[int] | None = None
+    start_coordinate: list[int] | None = None
+    chunk_shape: list[int] | None = None
+    data_file: str | None = None
     cycle: int | None = None
     quantization: QuantizationMetadata | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -59,10 +77,13 @@ class TraceEvent:
             "run_id": self.run_id,
             "source_backend": self.source_backend,
             "model_id": self.model_id,
-            "operation_id": self.operation_id,
+            "source_operation_id": self.source_operation_id,
+            "compiled_operation_id": self.compiled_operation_id,
+            "graph_stage": self.graph_stage,
             "operation_name": self.operation_name,
             "operation_type": self.operation_type,
             "hardware_stage": self.hardware_stage,
+            "trace_point": self.trace_point,
             "tensor_name": self.tensor_name,
             "layout": self.layout,
             "dtype": self.dtype,
@@ -72,11 +93,25 @@ class TraceEvent:
             raise TraceError(
                 f"Trace event has empty required fields: {', '.join(missing)}"
             )
-        if self.source_backend not in SUPPORTED_BACKENDS:
-            raise TraceError(f"Unsupported trace source backend: {self.source_backend}")
+        if BACKEND_PATTERN.fullmatch(self.source_backend) is None:
+            raise TraceError(f"Malformed trace source backend: {self.source_backend}")
+        if self.trace_point not in TRACE_POINTS:
+            raise TraceError(f"Unsupported trace point: {self.trace_point}")
         if not self.shape or any(value <= 0 for value in self.shape):
             raise TraceError("Trace shape dimensions must be positive")
-        if len(self.coordinate) != len(self.shape):
+        if self.event_type == "scalar":
+            self._validate_scalar()
+        elif self.event_type == "tensor_chunk":
+            self._validate_chunk()
+        else:
+            raise TraceError(f"Unsupported trace event type: {self.event_type}")
+        if self.cycle is not None and self.cycle < 0:
+            raise TraceError("Trace cycle must be non-negative")
+        if self.quantization is not None:
+            self.quantization.validate()
+
+    def _validate_scalar(self) -> None:
+        if self.coordinate is None or len(self.coordinate) != len(self.shape):
             raise TraceError("Coordinate rank does not match tensor shape")
         if any(
             index < 0 or index >= size
@@ -84,13 +119,40 @@ class TraceEvent:
         ):
             raise TraceError("Trace coordinate is outside the tensor shape")
         if isinstance(self.value, bool) or not isinstance(self.value, (int, float)):
-            raise TraceError("Trace value must be numeric")
+            raise TraceError("Scalar trace value must be numeric")
         if isinstance(self.value, float) and not math.isfinite(self.value):
             raise TraceError("Trace value must be finite")
-        if self.cycle is not None and self.cycle < 0:
-            raise TraceError("Trace cycle must be non-negative")
-        if self.quantization is not None:
-            self.quantization.validate()
+        if any(
+            value is not None
+            for value in (self.start_coordinate, self.chunk_shape, self.data_file)
+        ):
+            raise TraceError("Scalar event contains tensor-chunk fields")
+
+    def _validate_chunk(self) -> None:
+        if self.value is not None or self.coordinate is not None:
+            raise TraceError("Tensor-chunk event contains scalar fields")
+        if (
+            self.start_coordinate is None
+            or self.chunk_shape is None
+            or not self.data_file
+        ):
+            raise TraceError("Tensor-chunk event is missing payload fields")
+        if len(self.start_coordinate) != len(self.shape) or len(
+            self.chunk_shape
+        ) != len(self.shape):
+            raise TraceError("Tensor-chunk rank does not match tensor shape")
+        if any(size <= 0 for size in self.chunk_shape):
+            raise TraceError("Tensor-chunk dimensions must be positive")
+        if any(
+            start < 0 or start + size > total
+            for start, size, total in zip(
+                self.start_coordinate, self.chunk_shape, self.shape, strict=True
+            )
+        ):
+            raise TraceError("Tensor chunk is outside the tensor shape")
+        payload = Path(self.data_file)
+        if payload.is_absolute() or ".." in payload.parts:
+            raise TraceError("Tensor payload path must be relative and contained")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -104,7 +166,7 @@ class TraceEvent:
             if quantization is not None:
                 value["quantization"] = QuantizationMetadata(**quantization)
             event = cls(**value)
-        except (TypeError, KeyError) as error:
+        except TypeError as error:
             raise TraceError(f"Invalid trace event structure: {error}") from error
         event.validate()
         return event
@@ -140,10 +202,11 @@ def write_trace(path: str | Path, events: list[TraceEvent]) -> Path:
 
 
 def read_trace(path: str | Path) -> TraceSet:
+    source = Path(path)
     events: list[TraceEvent] = []
     try:
         for line_number, line in enumerate(
-            Path(path).read_text(encoding="utf-8").splitlines(), 1
+            source.read_text(encoding="utf-8").splitlines(), 1
         ):
             if not line.strip():
                 continue
@@ -153,7 +216,12 @@ def read_trace(path: str | Path) -> TraceSet:
                 raise TraceError(f"Invalid JSON on trace line {line_number}") from error
             if not isinstance(data, dict):
                 raise TraceError(f"Trace line {line_number} is not an object")
-            events.append(TraceEvent.from_dict(data))
+            event = TraceEvent.from_dict(data)
+            if event.event_type == "tensor_chunk":
+                payload = source.parent / str(event.data_file)
+                if not payload.is_file():
+                    raise TraceError(f"Missing tensor payload: {event.data_file}")
+            events.append(event)
     except OSError as error:
         raise TraceError(f"Could not read trace: {error}") from error
     trace = TraceSet(events)

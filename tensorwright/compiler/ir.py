@@ -46,6 +46,8 @@ class Operation:
     assigned_backend: str
     fused_operations: list[str] = field(default_factory=list)
     estimated_operation_count: int | None = None
+    source_operation_id: str | None = None
+    fused_source_operation_ids: list[str] = field(default_factory=list)
 
 
 @dataclass

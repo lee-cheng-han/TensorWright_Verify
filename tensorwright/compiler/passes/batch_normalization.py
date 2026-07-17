@@ -123,4 +123,8 @@ class FoldBatchNormalization:
         convolution.inputs = [convolution.inputs[0], weight_name, bias_name]
         convolution.outputs = list(batch_norm.outputs)
         convolution.fused_operations.append(batch_norm.name)
+        if batch_norm.source_operation_id is not None:
+            convolution.fused_source_operation_ids.append(
+                batch_norm.source_operation_id
+            )
         return True

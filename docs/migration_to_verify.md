@@ -39,7 +39,8 @@ The existing bundle already contains graph, quantization, schedule, layout, and 
 data; future bundle versions may add explicit trace-point and hardware-stage mappings.
 Version 1 remains readable, and fields will not be removed silently.
 
-Reference trace insertion occurs after each quantized operation output. Proposed RTL
+Reference trace insertion occurs after each quantized operation output. Large payloads
+use `.npy` tensor chunks while small or selected regions retain scalar events. Proposed RTL
 insertion points are window output, per-channel accumulator, bias/requantization output,
 final stream handshake, and control completion/counters. M12 will select and implement
 the smallest stable set without exposing internal state for control.

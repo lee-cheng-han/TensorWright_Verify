@@ -167,6 +167,9 @@ def _read_operations(model: ModelProto) -> list[Operation]:
                 },
                 hardware_supported=node.op_type in {"Conv", "Relu"},
                 assigned_backend=_BACKENDS[node.op_type],
+                source_operation_id=(
+                    f"onnx:{node.name}" if node.name else f"onnx:{node.op_type}:{index}"
+                ),
             )
         )
     return operations

@@ -18,13 +18,13 @@ TensorWright does not position itself as a replacement for FINN or hls4ml.
 - Bit-accurate integer reference and multi-channel convolution RTL
 - AXI-style streams, control registers, errors, interrupts, and counters
 - Versioned `.twmodel` bundles and command-driven simulation host
-- Canonical trace schema version 1 with strict validation and JSONL round trips
+- Canonical trace schema version 2 with strict validation and chunked tensor payloads
 - Optional operation-output traces from the quantized Python reference
 - `tensorwright trace inspect` trace summaries
 
-The currently tested trace path is the quantized Python reference. The custom RTL is the
-first hardware trace target in Milestone 12. FINN and hls4ml adapters are planned only;
-no compatibility is claimed today.
+The current supported canonical trace source is the quantized Python reference.
+Cross-backend differential verification begins when the RTL trace adapter is completed
+in Milestone 12. FINN and hls4ml adapters are planned only; no compatibility is claimed.
 
 ## Planned verification workflow
 

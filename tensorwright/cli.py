@@ -70,7 +70,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"tensorwright: trace inspection failed: {error}", file=sys.stderr)
             return 1
         events = trace_set.events
-        operations = sorted({event.operation_id for event in events})
+        operations = sorted({event.compiled_operation_id for event in events})
         tensors = sorted({event.tensor_name for event in events})
         has_cycles = any(event.cycle is not None for event in events)
         has_quantization = any(event.quantization is not None for event in events)
