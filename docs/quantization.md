@@ -22,8 +22,9 @@ from zero. Examples are `3 >> 1 = 2`, `-3 >> 1 = -2`, `1 >> 1 = 1`, and
 The integer reference checks input and weight ranges and requires every convolution
 partial sum and bias-added accumulator to remain within signed INT32. Overflow raises
 an error rather than silently wrapping. Fixed-point multiplication uses an unbounded
-software intermediate; a later RTL interface must select and document a sufficient
-hardware width for compiler-generated multipliers.
+software intermediate. Milestone 5 fixes the RTL contract to an unsigned 31-bit
+multiplier, a 7-bit non-negative shift, and a signed 64-bit product. The compiler rejects
+fixed-point parameters that do not fit this interface.
 
 The bit-accurate reference implementation is in `tensorwright.reference`. Convolution
 uses batch-one CHW activations and OIHW weights, explicit zero padding, positive integer

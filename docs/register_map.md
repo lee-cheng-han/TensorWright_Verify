@@ -28,8 +28,22 @@ not an implemented hardware interface.
 | `0x05C` | `INPUT_STALLS` | Input-stall cycles |
 | `0x060` | `OUTPUT_STALLS` | Output-stall cycles |
 | `0x064` | `ERROR_CODE` | Last error |
+| `0x068` | `WEIGHT_LOAD_CYCLES` | Weight-loading cycles |
+| `0x06C` | `OUTPUT_COUNT` | Produced output values |
+| `0x070` | `INPUT_COUNT` | Consumed input values |
+| `0x074` | `LAYER_INVOCATIONS` | Accepted layer commands |
+| `0x078` | `EXECUTED_MACS_LOW` | Executed MACs, low word |
+| `0x07C` | `EXECUTED_MACS_HIGH` | Executed MACs, high word |
+| `0x080` | `ERROR_COUNT` | Detected command errors |
 
 Before RTL implementation, each register must define reset value, access type, bit
 fields, illegal values, busy-time write behavior, write-one-to-clear behavior, counter
 overflow, software ownership, and recovery. Unspecified offsets must return a defined
 bus response rather than aliasing a register.
+
+This same logical register model must be used by cocotb simulation and future AXI4-Lite
+hardware access. Milestone 7 must freeze `DEVICE_ID`, interface-version compatibility,
+start/completion semantics, timeout-visible state, and every counter's enable, reset,
+saturation or wrap behavior. Simulation-only shortcuts must not add hidden control
+paths. The simulation runtime will read counters through register transactions, not
+direct hierarchical RTL access.

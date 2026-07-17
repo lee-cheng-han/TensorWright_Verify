@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tensorwright"
 version = "0.0.0"
-description = "Hardware-aware machine-learning compiler and FPGA inference platform"
+description = "ONNX-to-accelerator compilation and verification platform"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "cocotb>=2.0,<3; python_version < '3.14'",
     "mypy>=1.10",
     "ruff>=0.5",
 ]
@@ -37,9 +38,14 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
-files = ["tensorwright", "tests"]
+files = ["tensorwright", "tests", "scripts", "verification/cocotb"]
 
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*", "onnx", "onnx.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["cocotb", "cocotb.*", "cocotb_tools", "cocotb_tools.*"]
 follow_imports = "skip"
 ignore_missing_imports = true

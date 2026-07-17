@@ -1,14 +1,25 @@
 # TensorWright
 
-TensorWright is a hardware-aware machine-learning compiler and FPGA inference platform that imports small ONNX neural networks, performs graph optimization and INT8 quantization, generates hardware execution schedules, and deploys supported operations to a reusable SystemVerilog accelerator on a Zybo Z7-20. The system compares FPGA results against a bit-accurate software reference and reports correctness, latency, throughput, FPGA utilization, and hardware-software bottlenecks.
+TensorWright is an ONNX-to-accelerator compilation and verification platform that
+performs graph optimization, INT8 quantization, hardware scheduling, simulated runtime
+execution, bit-accurate RTL verification, and FPGA synthesis analysis.
+
+The first complete release is simulation-first and requires no physical FPGA board. It
+targets a reusable SystemVerilog accelerator for the Zynq-7020 used by the Zybo Z7-20,
+while reserving physical board deployment and measurements for a future extension.
 
 ## Status
 
-Milestone 4 provides the project specification, installable Python package, CLI,
-bit-accurate INT8 reference, ONNX frontend, typed IR, deterministic optimization,
-calibration, per-channel weight quantization, mixed-backend quantized model execution,
-and measured compilation reports. Runtime, RTL, deployment bundles, and hardware
-execution are intentionally not implemented yet.
+Milestone 5 provides the project specification, installable Python package, compiler,
+bit-accurate INT8 reference, quantized software execution, and a synthesizable nine-lane
+RTL arithmetic core with exact Verilator differential tests. Streaming, integrated
+accelerator control, runtime, deployment bundles, and hardware execution are not yet
+implemented.
+
+The current implementation does not claim RTL-simulated execution, physical FPGA
+execution, measured hardware speedup, board power, DMA latency, or ARM-to-FPGA
+bring-up. See the [simulation-first architecture](docs/architecture.md),
+[roadmap](docs/roadmap.md), and [metric classifications](docs/performance_model.md).
 
 ## Development
 
@@ -35,11 +46,14 @@ tensorwright/
 ├── pyproject.toml
 ├── compiler/
 ├── tensorwright/
+├── rtl/
+├── verification/
+├── scripts/
 ├── tests/
 └── docs/
 ```
 
-Directories for the runtime, RTL, FPGA, ASIC, and dashboard will be introduced only
+Directories for the runtime, FPGA, ASIC, and dashboard will be introduced only
 when their milestones add functional code.
 
 ## License

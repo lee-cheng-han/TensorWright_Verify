@@ -1,9 +1,9 @@
 # Verification plan
 
-TensorWright uses exact differential checks across four boundaries: framework FP32
-versus ONNX FP32, ONNX FP32 versus quantized software, quantized software versus RTL,
-and RTL versus FPGA hardware. Results from later boundaries are not inferred from an
-earlier pass.
+TensorWright uses exact differential checks across the first-release boundaries:
+framework FP32 versus ONNX FP32, ONNX FP32 versus quantized software, and quantized
+software versus RTL simulation. Future board deployment adds RTL simulation versus FPGA
+hardware. Results from one boundary are never inferred for another.
 
 Milestone 0 tests installation-facing CLI behavior. Milestone 1 includes directed
 arithmetic edge cases, small multi-channel convolution, validation failures, and
@@ -32,3 +32,16 @@ Milestone 4 tests observed calibration ranges, activation and per-output-channel
 metadata, INT32 biases, bounded fixed-point multipliers, complete Conv/MaxPool/View/Gemm/
 Softmax execution, deterministic JSON reports, measured output error, optional labeled
 accuracy, and rejection of empty, non-finite, or incorrectly shaped samples.
+
+The no-board verification path will use cocotb to reset and identify the device, program
+registers, drive ready/valid streams under deterministic or seeded randomized
+backpressure, enforce timeouts, collect counters and outputs, and report the first exact
+mismatch with layer, tensor coordinate, arithmetic context, seed, and simulation cycle.
+Protocol assertions and a compact waveform/trace artifact complement differential
+checks; they do not replace them.
+
+Milestone 5 exhaustively tests all signed INT8 multiplier inputs and differentially
+tests directed and seeded-random post-processing and multi-cycle dot products against
+the Python reference. Verilator lint and inline reset/input/overflow assertions are part
+of the regression. Cocotb sources are present but could not execute in the current
+Python 3.14 environment because cocotb 2.0.1 supports Python only through 3.13.

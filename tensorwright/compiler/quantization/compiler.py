@@ -211,8 +211,10 @@ def _fixed_point_parameters(
             multiplier //= 2
             exponent += 1
         shift = 31 - exponent
-        if shift < 0:
-            raise QuantizationError("Requantization ratio is too large")
+        if shift < 0 or shift > 127:
+            raise QuantizationError(
+                "Requantization shift does not fit the RTL interface"
+            )
         multipliers[index] = multiplier
         shifts[index] = shift
     return multipliers, shifts
