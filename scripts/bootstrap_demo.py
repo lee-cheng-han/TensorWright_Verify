@@ -49,7 +49,16 @@ def main() -> int:
     if check.returncode != 0:
         print("Installing TensorWright demo dependencies...", flush=True)
         install = subprocess.run(
-            [str(python), "-m", "pip", "install", "-e", str(ROOT)],
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "-c",
+                str(ROOT / "constraints-demo.txt"),
+                "-e",
+                str(ROOT),
+            ],
             cwd=ROOT,
             check=False,
         )

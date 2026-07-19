@@ -10,7 +10,11 @@ from pathlib import Path
 import numpy as np
 
 from tensorwright.cli import main
-from tensorwright.dashboard import DashboardError, generate_dashboard
+from tensorwright.dashboard import (
+    DashboardError,
+    generate_dashboard,
+    generate_presentation_dashboard,
+)
 from tensorwright.trace import TraceEvent, write_trace
 from tests.test_trace_comparison import _event
 
@@ -64,6 +68,33 @@ class DashboardTest(unittest.TestCase):
         self.assertIn("No protocol findings", document)
         self.assertIn("Complete machine-readable report", document)
 
+    def test_protocol_failure_uses_structural_summary_and_dynamic_navigation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reference = write_trace(
+                root / "reference.jsonl",
+                [_reference(10), _event(20, [0, 0, 0, 1])],
+            )
+            candidate = write_trace(root / "candidate.jsonl", [_candidate(10)])
+            output = root / "protocol.html"
+            generate_dashboard(
+                reference,
+                candidate,
+                output,
+                scenario_note="One output transfer is missing.",
+            )
+            document = output.read_text(encoding="utf-8")
+        self.assertIn("Expected output transfer is missing", document)
+        self.assertIn("NOT EVALUATED", document)
+        self.assertIn("Expected outputs: <b>2</b>", document)
+        self.assertIn("Received outputs: <b>1</b>", document)
+        self.assertIn("Comparable values: <b>1</b>", document)
+        self.assertIn("Missing transfers: <b>1</b>", document)
+        self.assertNotIn('href="#arithmetic-evidence"', document)
+        self.assertNotIn('href="#regression"', document)
+
     def test_renders_match_and_optional_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -99,13 +130,16 @@ class DashboardTest(unittest.TestCase):
                 "def test_case():\n    assert True\n", encoding="utf-8"
             )
             output = root / "dashboard.html"
-            generate_dashboard(
+            result = generate_dashboard(
                 reference,
                 candidate,
                 output,
                 baseline_candidate_trace=baseline,
                 scenario_note="One-unit controlled fault",
                 arithmetic_evidence={
+                    "source": "sampled directly from Verilator RTL internals",
+                    "cycle": 7,
+                    "accepted_cycle": 10,
                     "accumulator": 24,
                     "bias": -491,
                     "biased": -467,
@@ -117,8 +151,26 @@ class DashboardTest(unittest.TestCase):
                     "rtl_result": -116,
                 },
                 generated_regression=regression,
+                performance={"Accepted outputs": 1, "Output cycle span": 1},
+            )
+            presentation = root / "presentation.html"
+            generate_presentation_dashboard(
+                presentation,
+                result,
+                arithmetic_evidence={
+                    "cycle": 7,
+                    "accepted_cycle": 10,
+                    "product": -467,
+                    "rounding_offset": 2,
+                    "shift": 2,
+                    "software_result": -117,
+                    "rtl_result": -116,
+                },
+                performance={"Observed stream throughput": "0.2 outputs/cycle"},
+                regression_path=regression,
             )
             document = output.read_text(encoding="utf-8")
+            presentation_document = presentation.read_text(encoding="utf-8")
         self.assertIn("Controlled demo fault", document)
         self.assertIn("1/1 values matched", document)
         self.assertIn("SOFTWARE", document)
@@ -126,10 +178,18 @@ class DashboardTest(unittest.TestCase):
         self.assertIn("Bounded tensor window", document)
         self.assertIn("Values before first divergence", document)
         self.assertIn("Why this value differs", document)
+        self.assertIn("Confirmed from hardware", document)
+        self.assertIn("Arithmetic-stage cycle", document)
+        self.assertIn("Output acceptance cycle", document)
+        self.assertIn("3 cycles", document)
+        self.assertIn("confirmed", document)
+        self.assertIn("Hardware execution", document)
         self.assertIn("Rounding + shift", document)
         self.assertIn("Recommended fix", document)
         self.assertIn("rounded_magnitude", document)
         self.assertIn("Bug locked into regression", document)
+        self.assertIn("Found the first hardware error", presentation_document)
+        self.assertIn("Pipeline latency", presentation_document)
 
     def test_escapes_untrusted_trace_content(self) -> None:
         malicious = "model<script>alert(1)</script>"
@@ -165,9 +225,7 @@ class DashboardTest(unittest.TestCase):
                     [0, 0, 0, 0],
                     backend=backend,
                     trace_point=(
-                        "operation_output"
-                        if name == "reference"
-                        else "stream_transfer"
+                        "operation_output" if name == "reference" else "stream_transfer"
                     ),
                 )
                 data = event.to_dict()

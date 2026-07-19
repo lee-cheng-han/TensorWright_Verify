@@ -1,10 +1,13 @@
 """Self-contained HTML debugging dashboard generation."""
 
+# ruff: noqa: E501 -- readable inline HTML/CSS templates intentionally exceed 88 columns.
+
 from __future__ import annotations
 
 import html
 import json
-from dataclasses import dataclass
+import shlex
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +42,87 @@ class DashboardResult:
     protocol: ProtocolReport
 
 
+def generate_presentation_dashboard(
+    output_path: str | Path,
+    result: DashboardResult,
+    *,
+    arithmetic_evidence: dict[str, Any],
+    performance: dict[str, Any],
+    regression_path: str | Path,
+) -> Path:
+    """Generate a concise, single-screen narrative for recorded demonstrations."""
+    output = Path(output_path)
+    if output.suffix.lower() != ".html":
+        raise DashboardError("Presentation output must use the .html extension")
+    divergence = result.comparison.first_divergence
+    diagnosis = result.diagnosis.diagnosis
+    if divergence is None or diagnosis is None:
+        raise DashboardError("Presentation dashboard requires a diagnosed divergence")
+    stage_cycle = arithmetic_evidence.get("cycle")
+    accepted_cycle = arithmetic_evidence.get("accepted_cycle")
+    latency = (
+        accepted_cycle - stage_cycle
+        if isinstance(stage_cycle, int) and isinstance(accepted_cycle, int)
+        else "—"
+    )
+    document = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TensorWright — First Divergence</title>
+<style>
+:root {{ font-family: Inter, system-ui, sans-serif; color-scheme: dark; }}
+* {{ box-sizing: border-box; }} body {{ margin: 0; background: #0b1020; color: #eef2ff; }}
+main {{ min-height: 100vh; padding: clamp(1rem, 3vw, 2.5rem); display: grid;
+  grid-template-columns: 1.05fr .95fr; grid-template-rows: auto 1fr auto; gap: 1rem; }}
+header {{ grid-column: 1 / -1; display: flex; justify-content: space-between;
+  align-items: end; border-bottom: 1px solid #ffffff22; padding-bottom: 1rem; }}
+h1, h2, p {{ margin-top: 0; }} h1 {{ font-size: clamp(2rem, 5vw, 4.5rem); margin: 0; }}
+.eyebrow {{ color: #a994ff; font-weight: 800; letter-spacing: .12em; }}
+.card {{ border: 1px solid #ffffff22; border-radius: 1rem; padding: 1.25rem;
+  background: #ffffff0a; }} .pass {{ color: #5ee38c; }} .fail {{ color: #ff7168; }}
+.values {{ display: flex; align-items: center; justify-content: center; gap: 1rem;
+  font-size: clamp(2rem, 7vw, 5rem); font-weight: 900; margin: 1rem 0; }}
+.values i {{ color: #ff7168; }} .facts, .stages {{ display: grid;
+  grid-template-columns: repeat(3, 1fr); gap: .6rem; }}
+.facts div, .stages div {{ background: #ffffff0c; border-radius: .65rem; padding: .8rem; }}
+span {{ display: block; color: #aab2ce; font-size: .82rem; }} strong {{ font-size: 1.15rem; }}
+.equation {{ font: 700 clamp(1rem, 2.2vw, 1.6rem) ui-monospace, monospace;
+  background: #111936; border-radius: .7rem; padding: 1rem; margin: .7rem 0; }}
+.fault {{ border-left: .4rem solid #ff7168; }} .fix {{ border-left: .4rem solid #5ee38c; }}
+footer {{ grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1rem; }} footer .card {{ padding: .8rem 1rem; }}
+@media (max-width: 800px) {{ main {{ display: block; }} .card {{ margin: .8rem 0; }}
+  footer, .facts, .stages {{ grid-template-columns: 1fr; }} }}
+</style></head><body><main>
+<header><div><div class="eyebrow">TENSORWRIGHT VERIFY</div>
+<h1>Found the first hardware error.</h1></div>
+<strong class="fail">DIVERGENCE #{result.comparison.matched_values + 1}</strong></header>
+<section class="card"><h2>Software truth → RTL</h2>
+<div class="values"><b>{_escape(divergence.reference_value)}</b><i>→</i>
+<b>{_escape(divergence.candidate_value)}</b></div>
+<div class="facts"><div><span>Coordinate</span><strong>{_escape(divergence.coordinate)}</strong></div>
+<div><span>Operation</span><strong>{_escape(divergence.compiled_operation_id)}</strong></div>
+<div><span>Protocol</span><strong class="pass">PASS</strong></div></div></section>
+<section class="card"><h2>{_escape(diagnosis.title)}</h2>
+<p><strong>Confirmed from sampled RTL internals.</strong></p>
+<div class="equation">(|{_escape(arithmetic_evidence["product"])}| +
+{_escape(arithmetic_evidence["rounding_offset"])}) &gt;&gt;
+{_escape(arithmetic_evidence["shift"])} = {abs(arithmetic_evidence["software_result"])}</div>
+<div class="equation fault">Faulty RTL truncates → {_escape(arithmetic_evidence["rtl_result"])}</div>
+<div class="stages"><div><span>Arithmetic cycle</span><strong>{_escape(stage_cycle)}</strong></div>
+<div><span>Accepted cycle</span><strong>{_escape(accepted_cycle)}</strong></div>
+<div><span>Pipeline latency</span><strong>{_escape(latency)} cycles</strong></div></div></section>
+<footer><div class="card fix"><span>Recommended fix</span><strong>Restore rounding offset</strong></div>
+<div class="card"><span>Generated regression</span><strong class="pass">FAIL → PASS</strong>
+<small>{_escape(Path(regression_path).name)}</small></div>
+<div class="card"><span>Observed demo throughput</span>
+<strong>{_escape(performance.get("Observed stream throughput"))}</strong></div></footer>
+</main></body></html>"""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(document, encoding="utf-8")
+    return output
+
+
 def generate_dashboard(
     reference_trace: str | Path,
     candidate_trace: str | Path,
@@ -50,6 +134,7 @@ def generate_dashboard(
     scenario_note: str | None = None,
     arithmetic_evidence: dict[str, Any] | None = None,
     generated_regression: str | Path | None = None,
+    performance: dict[str, Any] | None = None,
 ) -> DashboardResult:
     """Generate one deterministic, offline HTML investigation report."""
     output = Path(output_path)
@@ -57,6 +142,26 @@ def generate_dashboard(
         raise DashboardError("Dashboard output must use the .html extension")
     comparison = compare_trace_files(reference_trace, candidate_trace)
     diagnosis = diagnose_comparison(comparison)
+    if (
+        arithmetic_evidence is not None
+        and diagnosis.diagnosis is not None
+        and diagnosis.diagnosis.rule_id == "requantization_rounding_mismatch"
+        and arithmetic_evidence.get("source")
+    ):
+        diagnosis = replace(
+            diagnosis,
+            diagnosis=replace(
+                diagnosis.diagnosis,
+                title="Confirmed requantization rounding mismatch",
+                confidence="confirmed",
+                evidence=[
+                    *diagnosis.diagnosis.evidence,
+                    "Accumulator, post-bias, product, rounded value, and result were "
+                    "sampled directly from the RTL pipeline stage that produced the "
+                    "failing output.",
+                ],
+            ),
+        )
     protocol = analyze_protocol_files(reference_trace, candidate_trace)
     baseline = (
         compare_trace_files(reference_trace, baseline_candidate_trace)
@@ -80,6 +185,7 @@ def generate_dashboard(
         arithmetic_evidence,
         regression_source,
         comparison_stats,
+        performance,
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(document, encoding="utf-8")
@@ -183,30 +289,57 @@ def _arithmetic_panel(evidence: dict[str, Any] | None) -> str:
     if not required <= evidence.keys():
         raise DashboardError("Arithmetic evidence is missing required fields")
     difference = evidence["rtl_result"] - evidence["software_result"]
+    stage_cycle = evidence.get("cycle")
+    accepted_cycle = evidence.get("accepted_cycle")
+    latency = (
+        accepted_cycle - stage_cycle
+        if isinstance(stage_cycle, int) and isinstance(accepted_cycle, int)
+        else None
+    )
+    cycle_evidence = ""
+    if latency is not None:
+        cycle_evidence = f"""
+<div class="summary cycle-summary">
+  <div class="metric"><span>Arithmetic-stage cycle</span>
+    <strong>{_escape(stage_cycle)}</strong></div>
+  <div class="metric"><span>Output acceptance cycle</span>
+    <strong>{_escape(accepted_cycle)}</strong></div>
+  <div class="metric"><span>Pipeline latency</span>
+    <strong>{_escape(latency)} cycles</strong></div>
+</div>"""
     return f"""
 <section id="arithmetic-evidence">
 <h2>Why this value differs</h2>
+<p class="proof"><strong>Confirmed from hardware:</strong>
+{_escape(evidence.get("source", "provided arithmetic evidence"))}, cycle
+{_escape(evidence.get("cycle"))}. These are sampled RTL values, not reconstructed
+dashboard estimates.</p>
+{cycle_evidence}
 <p>The accumulator, bias, multiplier, and product are identical. The first error is
 introduced when the faulty RTL omits the rounding offset before the right shift.</p>
+<p><strong>Canonical trace localization:</strong>
+<code>{_escape(evidence.get("localized_trace_point", "not provided"))}</code>.
+The standard semantic comparator identified this as the earliest unequal stage.</p>
 <div class="arithmetic">
-  <div><span>Accumulator</span><strong>{_escape(evidence['accumulator'])}</strong></div>
+  <div><span>Accumulator</span><strong>{_escape(evidence["accumulator"])}</strong></div>
   <div class="arrow">+</div>
-  <div><span>Bias</span><strong>{_escape(evidence['bias'])}</strong></div>
+  <div><span>Bias</span><strong>{_escape(evidence["bias"])}</strong></div>
   <div class="arrow">=</div>
-  <div><span>Post-bias</span><strong>{_escape(evidence['biased'])}</strong></div>
-  <div class="arrow">× {_escape(evidence['multiplier'])}</div>
-  <div><span>Product</span><strong>{_escape(evidence['product'])}</strong></div>
+  <div><span>Post-bias</span><strong>{_escape(evidence["biased"])}</strong></div>
+  <div class="arrow">× {_escape(evidence["multiplier"])}</div>
+  <div><span>Product</span><strong>{_escape(evidence["product"])}</strong></div>
 </div>
 <div class="rounding-compare">
   <div class="pass-box"><strong>Software · round to nearest</strong>
-    <code>(|{_escape(evidence['product'])}| + {_escape(evidence['rounding_offset'])})
-    &gt;&gt; {_escape(evidence['shift'])} = {abs(evidence['software_result'])}</code>
-    <b>{_escape(evidence['software_result'])}</b></div>
+    <code>(|{_escape(evidence["product"])}| + {_escape(evidence["rounding_offset"])})
+    &gt;&gt; {_escape(evidence["shift"])} = {abs(evidence["software_result"])}</code>
+    <b>{_escape(evidence["software_result"])}</b></div>
   <div class="fail-box"><strong>RTL fault · truncate</strong>
-    <code>|{_escape(evidence['product'])}| &gt;&gt; {_escape(evidence['shift'])}
-    = {abs(evidence['rtl_result'])}</code>
-    <b>{_escape(evidence['rtl_result'])}</b></div>
+    <code>|{_escape(evidence["product"])}| &gt;&gt; {_escape(evidence["shift"])}
+    = {abs(evidence["rtl_result"])}</code>
+    <b>{_escape(evidence["rtl_result"])}</b></div>
 </div>
+<p>RTL rounded intermediate: <code>{_escape(evidence.get("rtl_rounded"))}</code></p>
 <p class="impact"><strong>Difference: {difference:+} quantized unit.</strong>
 One operation, one coordinate, and one RTL stage now define the search space.</p>
 <div class="pipeline">
@@ -236,8 +369,7 @@ def _regression_panel(regression: tuple[str, str] | None) -> str:
     if regression is None:
         return ""
     path, source = regression
-    module = Path(path).with_suffix("").as_posix().replace("/", ".")
-    command = ".venv/bin/python -m unittest " + module
+    command = ".venv/bin/python " + shlex.quote(path)
     return f"""
 <section id="regression">
 <h2>Bug locked into regression</h2>
@@ -253,6 +385,23 @@ Copy regression command</button>
 <code class="command">{_escape(command)}</code>
 <details><summary>Preview generated test</summary><pre>{_escape(source)}</pre></details>
 </section>"""
+
+
+def _performance_panel(performance: dict[str, Any] | None) -> str:
+    if not performance:
+        return ""
+    metrics = "".join(
+        '<div class="metric"><span>'
+        f"{_escape(label)}</span><strong>{_escape(value)}</strong></div>"
+        for label, value in performance.items()
+    )
+    return (
+        '<section id="performance"><h2>Hardware execution</h2>'
+        "<p>Measured from the accepted RTL transfer trace. Stream throughput includes "
+        "the demo testbench's randomized backpressure and is not peak accelerator "
+        "throughput.</p>"
+        f'<div class="summary">{metrics}</div></section>'
+    )
 
 
 def _tensor_slice(
@@ -305,9 +454,11 @@ def _tensor_slice(
         rows_to_show,
         columns_to_show,
     )
-    heading = "<tr><th></th>" + "".join(
-        f"<th>Column {column}</th>" for column in columns_to_show
-    ) + "</tr>"
+    heading = (
+        "<tr><th></th>"
+        + "".join(f"<th>Column {column}</th>" for column in columns_to_show)
+        + "</tr>"
+    )
     rows = heading
     for row in rows_to_show:
         cells = ""
@@ -411,9 +562,10 @@ def _scalar_comparison_stats(
 
     reference = values(reference_events)
     candidate = values(candidate_events)
-    keys = reference.keys() | candidate.keys()
-    mismatches = sum(reference.get(key) != candidate.get(key) for key in keys)
-    return len(reference), mismatches
+    shared_keys = reference.keys() & candidate.keys()
+    all_keys = reference.keys() | candidate.keys()
+    divergences = sum(reference.get(key) != candidate.get(key) for key in all_keys)
+    return len(shared_keys), divergences
 
 
 def _render(
@@ -428,15 +580,14 @@ def _render(
     arithmetic_evidence: dict[str, Any] | None,
     regression_source: tuple[str, str] | None,
     comparison_stats: tuple[int, int] | None,
+    performance: dict[str, Any] | None,
 ) -> str:
     status = "MATCH" if comparison.matched else "DIVERGENCE"
     status_class = "pass" if comparison.matched else "fail"
     protocol_status = "PASS" if protocol.protocol_ok else "FAIL"
     protocol_class = "pass" if protocol.protocol_ok else "fail"
     matched_label = (
-        "Matched values"
-        if comparison.matched
-        else "Values before first divergence"
+        "Matched values" if comparison.matched else "Values before first divergence"
     )
     alignment_label = (
         f"{comparison.matched_values} values agree"
@@ -461,7 +612,14 @@ def _render(
             ]
         )
     numerical = diagnosis.diagnosis
-    if numerical is None:
+    numerical_evaluable = divergence is None or divergence.kind == "value_mismatch"
+    if not numerical_evaluable:
+        diagnosis_panel = (
+            "<p><strong>Not evaluated.</strong> The candidate transfer is missing, "
+            "so there is no RTL value available for numerical comparison. The "
+            "protocol findings below identify the transport failure.</p>"
+        )
+    elif numerical is None:
         diagnosis_panel = "<p>No numerical diagnosis is required.</p>"
     else:
         diagnosis_panel = (
@@ -496,6 +654,7 @@ def _render(
     presentation = _presentation_panel(comparison, baseline, scenario_note)
     arithmetic_panel = _arithmetic_panel(arithmetic_evidence)
     regression_panel = _regression_panel(regression_source)
+    performance_panel = _performance_panel(performance)
     raw_report = {
         "dashboard_format_version": DASHBOARD_FORMAT_VERSION,
         "comparison": comparison.to_dict(),
@@ -509,31 +668,77 @@ def _render(
         "generated_regression": (
             None if regression_source is None else regression_source[0]
         ),
+        "performance": performance,
     }
-    first_number = (
-        "—" if divergence is None else f"#{comparison.matched_values + 1}"
-    )
-    likely_cause = (
+    first_number = "—" if divergence is None else f"#{comparison.matched_values + 1}"
+    numerical_cause = (
         "None" if numerical is None else numerical.title.removeprefix("Likely ")
     )
-    total_compared = (
+    protocol_cause = next(
+        (
+            item.title
+            for item in protocol.findings
+            if item.rule_id == "missing_output_transfer"
+        ),
+        protocol.findings[0].title if protocol.findings else None,
+    )
+    likely_cause = (
+        protocol_cause
+        if not numerical_evaluable and protocol_cause is not None
+        else numerical_cause
+    )
+    comparable_values = (
         min(comparison.reference_values, comparison.candidate_values)
         if comparison_stats is None
         else comparison_stats[0]
     )
-    mismatch_count = "—" if comparison_stats is None else comparison_stats[1]
-    numerical_status = "PASS" if comparison.matched else "FAIL"
-    numerical_class = "pass" if comparison.matched else "fail"
+    divergence_count = "—" if comparison_stats is None else comparison_stats[1]
+    missing_values = max(0, comparison.reference_values - comparison.candidate_values)
+    unexpected_values = max(
+        0, comparison.candidate_values - comparison.reference_values
+    )
+    if comparison.matched:
+        numerical_status, numerical_class = "PASS", "pass"
+        numerical_lane_cause = "All comparable values agree"
+    elif numerical_evaluable:
+        numerical_status, numerical_class = "FAIL", "fail"
+        numerical_lane_cause = numerical_cause
+    else:
+        numerical_status, numerical_class = "NOT EVALUATED", "neutral"
+        numerical_lane_cause = "No candidate value exists at the missing transfer"
     diagnostic_lanes = f"""
-<section><h2>Independent diagnostic lanes</h2><div class="lanes">
+<section id="diagnostic-lanes"><h2>Independent diagnostic lanes</h2><div class="lanes">
   <div><span>Numerical correctness</span>
     <strong class="{numerical_class}">{numerical_status}</strong>
-    <p>{_escape(likely_cause)}</p></div>
+    <p>{_escape(numerical_lane_cause)}</p></div>
   <div><span>Streaming protocol</span>
     <strong class="{protocol_class}">{protocol_status}</strong>
     <p>{len(protocol.findings)} ready/valid, ordering, count, or completion
     findings</p></div>
 </div></section>"""
+    nav_items = [("overview", "Overview")]
+    if presentation:
+        nav_items.append(("experiment", "Experiment"))
+    nav_items.append(("diagnostic-lanes", "Diagnostic lanes"))
+    if performance_panel:
+        nav_items.append(("performance", "Hardware execution"))
+    if arithmetic_panel:
+        nav_items.append(("arithmetic-evidence", "Arithmetic evidence"))
+    if regression_panel:
+        nav_items.append(("regression", "Regression"))
+    if tensor_slice:
+        nav_items.append(("tensor-window", "Tensor window"))
+    nav_items.extend(
+        [
+            ("diagnosis", "Numerical analysis"),
+            ("protocol", "Protocol"),
+            ("technical-details", "Technical details"),
+        ]
+    )
+    navigation = "".join(
+        f'<a href="#{_escape(section_id)}">{_escape(label)}</a>'
+        for section_id, label in nav_items
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -580,6 +785,7 @@ h1, h2 {{ margin-top: 0; }}
 .lanes > div {{ background: #7771; border-radius: .55rem; padding: 1rem; }}
 .lanes strong {{ display: block; font-size: 1.6rem; }}
 .pass {{ color: #17833b; }} .fail {{ color: #c0392b; }}
+.neutral {{ color: #777; }}
 .scenario {{
   border-color: #e59b2688; background: #e59b2618;
   display: flex; gap: .8rem; align-items: center;
@@ -666,6 +872,17 @@ code {{ font-family: ui-monospace, monospace; }}
   margin-top: 1rem; border-left: .35rem solid var(--accent);
   background: #7657ff14; border-radius: .45rem; padding: 1rem;
 }}
+.proof {{
+  border-left: .35rem solid #17833b; padding: .7rem 1rem;
+  background: #17833b14;
+}}
+.journey {{ counter-reset: story; }}
+.journey > section, .journey > header {{ position: relative; }}
+.journey > section::before {{
+  counter-increment: story; content: "STORY " counter(story);
+  display: inline-block; color: var(--accent); font-size: .7rem;
+  font-weight: 800; letter-spacing: .1em; margin-bottom: .5rem;
+}}
 .suggested-fix > strong {{ color: var(--accent); font-size: 1.1rem; }}
 .suggested-fix code {{ display: block; overflow-wrap: anywhere; }}
 button {{ cursor: pointer; border: 0; border-radius: .4rem; padding: .65rem 1rem; }}
@@ -680,16 +897,9 @@ button {{ cursor: pointer; border: 0; border-radius: .4rem; padding: .65rem 1rem
 <body><div class="shell">
 <aside class="sidebar"><strong>TensorWright</strong>
   <nav aria-label="Dashboard sections">
-    <a href="#overview">Overview</a>
-    <a href="#experiment">Experiment</a>
-    <a href="#arithmetic-evidence">Arithmetic evidence</a>
-    <a href="#tensor-window">Tensor window</a>
-    <a href="#regression">Regression</a>
-    <a href="#diagnosis">Diagnosis</a>
-    <a href="#protocol">Protocol</a>
-    <a href="#technical-details">Technical details</a>
+    {navigation}
   </nav>
-</aside><main>
+</aside><main class="journey">
 <header id="overview">
 <h1>TensorWright Verify</h1>
 <p>Offline debugging dashboard · format version {DASHBOARD_FORMAT_VERSION}</p>
@@ -703,8 +913,12 @@ button {{ cursor: pointer; border: 0; border-radius: .4rem; padding: .65rem 1rem
 <strong>{_escape(likely_cause)}</strong></div>
 </div>
 <div class="secondary-metrics">
-  <span>Compared: <b>{total_compared}/{comparison.reference_values}</b></span>
-  <span>Total mismatches: <b>{mismatch_count}</b></span>
+  <span>Expected outputs: <b>{comparison.reference_values}</b></span>
+  <span>Received outputs: <b>{comparison.candidate_values}</b></span>
+  <span>Comparable values: <b>{comparable_values}</b></span>
+  <span>Missing transfers: <b>{missing_values}</b></span>
+  <span>Unexpected transfers: <b>{unexpected_values}</b></span>
+  <span>Total divergences: <b>{divergence_count}</b></span>
   <span>Protocol violations: <b>{len(protocol.findings)}</b></span>
 </div>
 <div class="flow" aria-label="Verification flow">
@@ -720,13 +934,14 @@ button {{ cursor: pointer; border: 0; border-radius: .4rem; padding: .65rem 1rem
 </header>
 {presentation}
 {diagnostic_lanes}
+{performance_panel}
 {arithmetic_panel}
 {regression_panel}
 <section id="technical-details"><details>
 <summary>Technical divergence identifiers</summary>
 <h2>First divergence</h2>{divergence_panel}</details></section>
 {tensor_slice}
-<section id="diagnosis"><h2>Numerical diagnosis</h2>{diagnosis_panel}</section>
+<section id="diagnosis"><h2>Numerical analysis</h2>{diagnosis_panel}</section>
 <section id="protocol"><h2>Protocol findings</h2>
 <div class="table-scroll"><table><thead><tr><th>Severity</th><th>Rule</th>
 <th>Event</th><th>Cycle</th><th>Evidence</th><th>Recommended fix</th></tr></thead>

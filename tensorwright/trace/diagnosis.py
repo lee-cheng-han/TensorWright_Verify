@@ -54,8 +54,8 @@ def _classify(divergence: Divergence) -> Diagnosis:
     if divergence.kind != "value_mismatch":
         return Diagnosis(
             rule_id="insufficient_numerical_evidence",
-            title="No numerical cause can be assigned",
-            confidence="high",
+            title="Numerical analysis is not applicable",
+            confidence="not_applicable",
             evidence=[
                 f"The first divergence is {divergence.kind}, not unequal values."
             ],

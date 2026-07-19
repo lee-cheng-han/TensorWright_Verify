@@ -20,13 +20,19 @@ The dashboard contains:
 - a complete machine-readable JSON report embedded for auditing.
 
 Large tensors are never expanded into the HTML document. Chunk-to-chunk comparisons use
-memory-mapped `.npy` payloads and bounded 65,536-value comparison blocks. The report shows
+memory-mapped `.npy` payloads and bounded 65,536-value comparison blocks. Mixed scalar/chunk
+comparisons also map payloads and resolve only requested coordinates instead of creating a
+Python object for every tensor value. The report shows
 at most a 5×5 window around the first divergence, regardless of whether the source tensor
 contains hundreds or millions of values. Source previews are capped at 12,000 characters.
 
 The desktop layout uses sticky section navigation and progressive disclosure. Summary,
 diagnostic lanes, arithmetic evidence, the bounded tensor window, and regression status stay
 prominent; raw identifiers and machine-readable details remain collapsed until requested.
+Demo reports add guided story markers, measured output-cycle and throughput metrics, and mark a
+numerical cause as confirmed only when intermediate values were sampled directly from RTL.
+The demo also generates a single-screen `presentation.html` for recordings; the full dashboards
+remain the auditable engineering reports.
 
 Reports are deterministic for identical artifacts, responsive, printable, and usable in light or
 dark color schemes. They contain no external assets, network requests, or server-side components.

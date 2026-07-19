@@ -23,17 +23,36 @@ def write_reference_trace(
     *,
     run_id: str = "run_000001",
     scalar_event_limit: int = 4096,
+    operation_ids: set[str] | None = None,
+    tensor_names: set[str] | None = None,
+    max_payload_bytes: int | None = None,
 ) -> Path:
-    """Execute a graph unchanged and optionally export operation-output values."""
+    """Execute a graph and export selected outputs with bounded payload storage."""
     values = execute_quantized(graph, inputs, capture_all=True)
     if scalar_event_limit < 0:
         raise ValueError("scalar_event_limit must be non-negative")
+    if max_payload_bytes is not None and max_payload_bytes <= 0:
+        raise ValueError("max_payload_bytes must be positive")
     destination = Path(output_path)
     events: list[TraceEvent] = []
     for operation_index, operation in enumerate(graph.operations):
         for tensor_name in operation.outputs:
+            source_id = operation.source_operation_id or f"synthetic:{operation.name}"
+            compiled_id = f"compiled:op_{operation_index:04d}"
+            if operation_ids is not None and not {
+                source_id,
+                compiled_id,
+            }.intersection(operation_ids):
+                continue
+            if tensor_names is not None and tensor_name not in tensor_names:
+                continue
             tensor = graph.tensors[tensor_name]
             value = values[tensor_name]
+            if max_payload_bytes is not None and value.nbytes > max_payload_bytes:
+                raise ValueError(
+                    f"Trace tensor {tensor_name} requires {value.nbytes} bytes, "
+                    f"exceeding max_payload_bytes={max_payload_bytes}"
+                )
             quantization = None
             if tensor.quantization_scale is not None:
                 scale = tensor.quantization_scale
@@ -42,8 +61,6 @@ def write_reference_trace(
                     zero_point=tensor.zero_point,
                     axis=0 if isinstance(scale, list) else None,
                 )
-            source_id = operation.source_operation_id or f"synthetic:{operation.name}"
-            compiled_id = f"compiled:op_{operation_index:04d}"
             common = {
                 "trace_version": TRACE_VERSION,
                 "run_id": run_id,
@@ -93,4 +110,6 @@ def write_reference_trace(
                             **common,
                         )
                     )
+    if not events:
+        raise ValueError("Trace selection produced no operation outputs")
     return write_trace(destination, events)

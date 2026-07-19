@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from tensorwright.reference import requantize_int32
@@ -15,6 +16,36 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build" / "rtl_vectors"
 RTL = ROOT / "rtl"
 VERIFICATION = ROOT / "verification" / "systemverilog"
+
+
+@dataclass(frozen=True)
+class RtlArithmeticSample:
+    """Postprocess values sampled from the real RTL on a valid input cycle."""
+
+    sequence: int
+    cycle: int
+    accumulator: int
+    bias: int
+    post_bias: int
+    multiplier: int
+    shift: int
+    product: int
+    rounded: int
+    result: int
+
+
+def read_arithmetic_log(path: Path) -> list[RtlArithmeticSample]:
+    samples: list[RtlArithmeticSample] = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        if not line.strip():
+            continue
+        fields = line.split()
+        if len(fields) != 10:
+            raise ValueError(f"Malformed RTL arithmetic log line {line_number}")
+        samples.append(RtlArithmeticSample(*(int(field) for field in fields)))
+    return samples
 
 
 def _run(command: list[str], *, quiet: bool = False) -> None:
@@ -154,7 +185,13 @@ def _convolution_vectors(path: Path) -> tuple[int, list[int]]:
     return case_count, first_expected
 
 
-def _reference_convolution_trace(path: Path, values: list[int]) -> Path:
+def _reference_convolution_trace(
+    path: Path,
+    values: list[int],
+    *,
+    source_operation_id: str = "synthetic:conv_0",
+    model_id: str = "rtl_convolution_regression",
+) -> Path:
     events = []
     for sequence, value in enumerate(values):
         output_channel, remainder = divmod(sequence, 9)
@@ -165,8 +202,8 @@ def _reference_convolution_trace(path: Path, values: list[int]) -> Path:
                 event_type="scalar",
                 run_id="python_convolution_case_0000",
                 source_backend="tensorwright.python_reference",
-                model_id="rtl_convolution_regression",
-                source_operation_id="synthetic:conv_0",
+                model_id=model_id,
+                source_operation_id=source_operation_id,
                 compiled_operation_id="compiled:op_0000",
                 fused_source_operation_ids=[],
                 graph_stage="post_quantization",

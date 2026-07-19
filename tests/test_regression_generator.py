@@ -16,8 +16,9 @@ from tensorwright.minimizer import FailureSignature
 from tensorwright.regression import (
     RegressionGenerationError,
     generate_cocotb_regression,
+    generate_rtl_arithmetic_regression,
 )
-from tensorwright.trace import write_trace
+from tensorwright.trace import compare_trace_files, write_trace
 from tests.test_trace_comparison import _event
 
 
@@ -112,6 +113,36 @@ class RegressionGeneratorTest(unittest.TestCase):
             )
             copied = package.path / "tensors" / "output.npy"
             self.assertTrue(copied.is_file())
+
+    def test_generates_rtl_arithmetic_case_from_divergence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reference = write_trace(
+                root / "reference.jsonl", [_event(-117, [0, 0, 0, 0])]
+            )
+            candidate = write_trace(
+                root / "candidate.jsonl",
+                [_event(-116, [0, 0, 0, 0], backend="custom.rtl")],
+            )
+            comparison = compare_trace_files(reference, candidate)
+            package = generate_rtl_arithmetic_regression(
+                comparison,
+                {
+                    "accumulator": 24,
+                    "bias": -491,
+                    "multiplier": 1,
+                    "shift": 2,
+                    "software_result": -117,
+                },
+                root / "generated",
+            )
+            py_compile.compile(str(package.test_path), doraise=True)
+            manifest = json.loads(package.manifest_path.read_text(encoding="utf-8"))
+            source = package.test_path.read_text(encoding="utf-8")
+        self.assertEqual(manifest["generated_from"]["reference_value"], -117)
+        self.assertEqual(manifest["arithmetic"]["accumulator"], 24)
+        self.assertEqual(manifest["arithmetic"]["software_result"], -117)
+        self.assertIn("TENSORWRIGHT_REGRESSION_FAULTY", source)
 
     def test_rejects_bad_name_report_and_nonempty_destination(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -298,8 +298,7 @@ class FinnExecutionContextAdapter:
                     raise AdapterError(f"Tensor {tensor_name!r} is empty")
                 if value.dtype.kind not in "iuf":
                     raise AdapterError(
-                        f"Tensor {tensor_name!r} has non-numeric dtype "
-                        f"{value.dtype}"
+                        f"Tensor {tensor_name!r} has non-numeric dtype {value.dtype}"
                     )
                 common: dict[str, Any] = {
                     "trace_version": TRACE_VERSION,
@@ -328,9 +327,7 @@ class FinnExecutionContextAdapter:
                     payload_dir = request.destination.parent / "tensors"
                     payload_dir.mkdir(parents=True, exist_ok=True)
                     safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", tensor_name)
-                    payload_name = (
-                        f"{self.payload_prefix}_{index:04d}_{safe_name}.npy"
-                    )
+                    payload_name = f"{self.payload_prefix}_{index:04d}_{safe_name}.npy"
                     np.save(payload_dir / payload_name, value, allow_pickle=False)
                     events.append(
                         TraceEvent(
@@ -413,9 +410,7 @@ def _npz_tensor_mapping(value: Any, index: int) -> dict[str, Any]:
     }
     unknown = sorted(value.keys() - allowed)
     if unknown:
-        raise AdapterError(
-            f"Unknown tensors[{index}] options: {', '.join(unknown)}"
-        )
+        raise AdapterError(f"Unknown tensors[{index}] options: {', '.join(unknown)}")
     required = {
         "tensor_name",
         "source_operation_id",
@@ -425,9 +420,7 @@ def _npz_tensor_mapping(value: Any, index: int) -> dict[str, Any]:
     }
     missing = sorted(required - value.keys())
     if missing:
-        raise AdapterError(
-            f"Missing tensors[{index}] options: {', '.join(missing)}"
-        )
+        raise AdapterError(f"Missing tensors[{index}] options: {', '.join(missing)}")
     for name in required | ({"hardware_stage", "layout"} & value.keys()):
         if not isinstance(value[name], str) or not value[name]:
             raise AdapterError(f"tensors[{index}].{name} must be a non-empty string")

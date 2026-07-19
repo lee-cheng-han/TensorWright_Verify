@@ -81,17 +81,11 @@ def main() -> int:
 def _make_model(model_wrapper: Callable[[Any], Any]) -> Any:
     input_info = helper.make_tensor_value_info("input", TensorProto.FLOAT, [1, 4])
     output_info = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 4])
-    intermediate = helper.make_tensor_value_info(
-        "add_out", TensorProto.FLOAT, [1, 4]
-    )
-    bias = helper.make_tensor(
-        "bias", TensorProto.FLOAT, [1, 4], [-2, 1, 3, -4]
-    )
+    intermediate = helper.make_tensor_value_info("add_out", TensorProto.FLOAT, [1, 4])
+    bias = helper.make_tensor("bias", TensorProto.FLOAT, [1, 4], [-2, 1, 3, -4])
     graph = helper.make_graph(
         [
-            helper.make_node(
-                "Add", ["input", "bias"], ["add_out"], name="Add_0"
-            ),
+            helper.make_node("Add", ["input", "bias"], ["add_out"], name="Add_0"),
             helper.make_node("Relu", ["add_out"], ["output"], name="Relu_1"),
         ],
         "finn_adapter_integration",

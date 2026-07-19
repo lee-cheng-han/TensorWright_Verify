@@ -1,4 +1,4 @@
-.PHONY: help setup format lint lint-rtl type-check test test-python test-rtl test-cocotb demo
+.PHONY: help setup format lint lint-rtl type-check test test-python test-rtl test-cocotb demo demo-clean demo-numerical-fault demo-protocol-fault
 
 PYTHON ?= python3
 
@@ -13,6 +13,9 @@ help:
 	@echo "  test-rtl    Run vector-driven RTL tests with Verilator"
 	@echo "  test-cocotb Run cocotb RTL tests when supported"
 	@echo "  demo        Run the video-friendly reference-versus-RTL demo"
+	@echo "  demo-clean  Run the demo and highlight the known-good baseline"
+	@echo "  demo-numerical-fault  Highlight arithmetic diagnosis"
+	@echo "  demo-protocol-fault   Highlight stream protocol diagnosis"
 
 setup:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -60,3 +63,12 @@ test-cocotb:
 
 demo:
 	$(PYTHON) -m scripts.bootstrap_demo $(DEMO_ARGS)
+
+demo-clean:
+	$(PYTHON) -m scripts.bootstrap_demo --focus clean $(DEMO_ARGS)
+
+demo-numerical-fault:
+	$(PYTHON) -m scripts.bootstrap_demo --focus numerical $(DEMO_ARGS)
+
+demo-protocol-fault:
+	$(PYTHON) -m scripts.bootstrap_demo --focus protocol $(DEMO_ARGS)

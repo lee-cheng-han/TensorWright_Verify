@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from tensorwright.minimizer import FailureSignature, MinimizationError
+from tensorwright.trace.compare import ComparisonReport
 from tensorwright.trace.schema import TraceEvent, read_trace
 
 REGRESSION_FORMAT_VERSION = 1
@@ -31,6 +32,58 @@ class RegressionPackage:
     test_path: Path
     manifest_path: Path
     name: str
+
+
+@dataclass(frozen=True)
+class ArithmeticRegressionPackage:
+    """Executable RTL regression generated from one arithmetic divergence."""
+
+    test_path: Path
+    manifest_path: Path
+
+
+def generate_rtl_arithmetic_regression(
+    comparison: ComparisonReport,
+    arithmetic_evidence: dict[str, Any],
+    output_directory: str | Path,
+    *,
+    name: str = "requantization_first_divergence",
+) -> ArithmeticRegressionPackage:
+    """Generate a real Verilator regression from captured first-divergence data."""
+    if NAME_PATTERN.fullmatch(name) is None:
+        raise RegressionGenerationError("Regression name must match [a-z][a-z0-9_]*")
+    divergence = comparison.first_divergence
+    if divergence is None or divergence.kind != "value_mismatch":
+        raise RegressionGenerationError("An unequal arithmetic divergence is required")
+    required = {"accumulator", "bias", "multiplier", "shift", "software_result"}
+    if not required <= arithmetic_evidence.keys():
+        raise RegressionGenerationError("Arithmetic evidence is incomplete")
+    destination = Path(output_directory)
+    destination.mkdir(parents=True, exist_ok=True)
+    test_path = destination / f"test_{name}.py"
+    manifest_path = destination / "manifest.json"
+    values = {key: int(arithmetic_evidence[key]) for key in required}
+    test_path.write_text(_rtl_arithmetic_test_source(name, values), encoding="utf-8")
+    manifest = {
+        "format_version": REGRESSION_FORMAT_VERSION,
+        "name": name,
+        "generated_from": {
+            "kind": divergence.kind,
+            "source_operation_id": divergence.source_operation_id,
+            "compiled_operation_id": divergence.compiled_operation_id,
+            "tensor_name": divergence.tensor_name,
+            "trace_point": divergence.trace_point,
+            "coordinate": divergence.coordinate,
+            "reference_value": divergence.reference_value,
+            "candidate_value": divergence.candidate_value,
+        },
+        "arithmetic": values,
+        "test_file": test_path.name,
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return ArithmeticRegressionPackage(test_path, manifest_path)
 
 
 def generate_cocotb_regression(
@@ -240,3 +293,63 @@ test module. The test fails with the preserved signature while the bug remains,
 reports signature drift as a distinct failure, and passes once the candidate trace
 matches the bundled reference.
 """
+
+
+def _rtl_arithmetic_test_source(name: str, values: dict[str, int]) -> str:
+    return f'''"""Generated from TensorWright's first arithmetic divergence."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path.cwd()))
+
+from scripts.run_verilator_tests import ROOT, RTL, VERIFICATION, _build_and_run
+
+BUILD = ROOT / "build" / "generated_regressions" / "{name}"
+
+
+def run_case(*, faulty: bool = False, quiet: bool = True) -> bool:
+    """Execute the captured arithmetic case against the real RTL postprocess."""
+    BUILD.mkdir(parents=True, exist_ok=True)
+    vector = BUILD / "vector.txt"
+    vector.write_text(
+        "{values["accumulator"]} {values["bias"]} {values["multiplier"]} "
+        "{values["shift"]} 0 {values["software_result"]}\\n",
+        encoding="utf-8",
+    )
+    defines = ["-DTENSORWRIGHT_DEMO_FAULT_REQUANT_ROUND"] if faulty else []
+    try:
+        _build_and_run(
+            "tb_postprocess",
+            [
+                RTL / "postprocess" / "tensorwright_postprocess.sv",
+                VERIFICATION / "tb_postprocess.sv",
+            ],
+            vector,
+            build_name="faulty" if faulty else "corrected",
+            build_root=BUILD,
+            quiet=quiet,
+            verilator_args=defines,
+        )
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
+class GeneratedArithmeticRegression(unittest.TestCase):
+    def test_captured_first_divergence(self) -> None:
+        faulty = os.environ.get("TENSORWRIGHT_REGRESSION_FAULTY") == "1"
+        self.assertTrue(
+            run_case(faulty=faulty),
+            "captured first-divergence arithmetic must match the software reference",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
+'''

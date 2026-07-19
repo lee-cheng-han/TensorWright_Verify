@@ -28,12 +28,12 @@ module tb_convolution_engine;
     );
 
     initial begin : test
-        integer file, trace_file, scanned, case_count, case_index, index, sent, received, cycles, simulation_cycle;
+        integer file, trace_file, arithmetic_trace_file, scanned, case_count, case_index, index, sent, received, cycles, simulation_cycle;
         integer expected_transfers, logical_sequence;
         integer bias_value, multiplier_value, shift_value, relu_value;
         logic [31:0] lfsr; logic source_fire, sink_fire;
         logic allow_mismatch;
-        string vector_file, trace_path;
+        string vector_file, trace_path, arithmetic_trace_path;
         allow_mismatch = $test$plusargs("ALLOW_MISMATCH");
         expected_transfers = $test$plusargs("EXPECT_DROPPED_TRANSFER") ? 17 : 18;
         if (!$value$plusargs("VECTOR_FILE=%s", vector_file)) $fatal(1, "VECTOR_FILE missing");
@@ -42,6 +42,11 @@ module tb_convolution_engine;
         if ($value$plusargs("TRACE_FILE=%s", trace_path)) begin
             trace_file = $fopen(trace_path, "w");
             if (!trace_file) $fatal(1, "cannot open trace output");
+        end
+        arithmetic_trace_file = 0;
+        if ($value$plusargs("ARITH_TRACE_FILE=%s", arithmetic_trace_path)) begin
+            arithmetic_trace_file = $fopen(arithmetic_trace_path, "w");
+            if (!arithmetic_trace_file) $fatal(1, "cannot open arithmetic trace output");
         end
         scanned = $fscanf(file, "%d", case_count);
         weight_valid = 0; activation_valid = 0; output_ready = 0; weight_data = 0;
@@ -78,6 +83,22 @@ module tb_convolution_engine;
             while (received < expected_transfers) begin
                 @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
                 output_ready = lfsr[4] | lfsr[7]; #1; sink_fire = output_valid && output_ready;
+                if ((arithmetic_trace_file != 0) && (case_index == 0) &&
+                    dut.arithmetic_core.postprocess.valid_i) begin
+                    logical_sequence = int'(dut.output_channel) * 9 +
+                        int'(dut.output_y) * 3 + int'(dut.output_x);
+                    $fdisplay(arithmetic_trace_file,
+                        "%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d",
+                        logical_sequence, simulation_cycle,
+                        $signed(dut.arithmetic_core.postprocess.accumulator_i),
+                        $signed(dut.arithmetic_core.postprocess.bias_i),
+                        $signed(dut.arithmetic_core.postprocess.biased),
+                        $signed(dut.arithmetic_core.postprocess.multiplier_i),
+                        dut.arithmetic_core.postprocess.shift_i,
+                        $signed(dut.arithmetic_core.postprocess.product),
+                        $signed(dut.arithmetic_core.postprocess.rounded),
+                        $signed(dut.arithmetic_core.postprocess.next_result));
+                end
                 if (sink_fire) begin
                     logical_sequence = int'(dut.output_channel) * 9 +
                         int'(dut.output_y) * 3 + int'(dut.output_x);
@@ -99,6 +120,7 @@ module tb_convolution_engine;
         end
         $fclose(file);
         if (trace_file != 0) $fclose(trace_file);
+        if (arithmetic_trace_file != 0) $fclose(arithmetic_trace_file);
         $display("Convolution engine passed %0d randomized layers", case_count);
         $finish;
     end

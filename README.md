@@ -96,6 +96,14 @@ Run the real reference-versus-Verilator hackathon demo with:
 make demo
 ```
 
+Use `make demo-clean`, `make demo-numerical-fault`, or `make demo-protocol-fault`
+to highlight a specific video segment. The demo imports its exact ONNX workload, samples
+intermediate arithmetic directly from Verilator RTL, reports measured cycles/throughput, and
+uses canonical stage traces to localize the first `post_requantization` error. It automatically
+generates and executes a regression from that divergence, creates a single-screen
+`build/demo/presentation.html`, and packages everything in
+`build/demo/tensorwright-demo-report.zip`.
+
 It produces a clean 18/18 comparison, a genuine requantization-rounding defect, a
 dropped-transfer protocol defect, first-divergence diagnoses, and self-contained reports
 at `build/demo/index.html` and `build/demo/protocol.html`. See the

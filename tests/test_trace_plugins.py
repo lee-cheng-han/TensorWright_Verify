@@ -262,9 +262,7 @@ class TracePluginTest(unittest.TestCase):
             )
             events = read_trace(output).events
         self.assertEqual([event.value for event in events], [12.0, 15.0] * 2)
-        self.assertTrue(
-            all(event.source_backend == "hls4ml.csim" for event in events)
-        )
+        self.assertTrue(all(event.source_backend == "hls4ml.csim" for event in events))
         self.assertTrue(
             all(event.hardware_stage == "hls4ml_layer_output" for event in events)
         )

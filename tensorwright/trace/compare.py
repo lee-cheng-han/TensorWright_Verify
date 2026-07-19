@@ -99,6 +99,20 @@ def compare_trace_files(
             **chunk_report,
         )
 
+    mixed_report = _compare_mixed_events(
+        reference.events,
+        candidate.events,
+        reference_source.parent,
+        candidate_source.parent,
+    )
+    if mixed_report is not None:
+        return ComparisonReport(
+            reference_backend=reference_identity.source_backend,
+            candidate_backend=candidate_identity.source_backend,
+            model_id=reference_identity.model_id,
+            **mixed_report,
+        )
+
     reference_values = _index_values(reference.events, reference_source.parent)
     candidate_values = _index_values(candidate.events, candidate_source.parent)
     ordered_keys = list(reference_values)
@@ -166,9 +180,7 @@ def _compare_chunk_events(
             expected = _array_value(
                 reference, expected_payload, (0,) * expected_payload.ndim
             )
-            actual = _array_value(
-                candidate, actual_payload, (0,) * actual_payload.ndim
-            )
+            actual = _array_value(candidate, actual_payload, (0,) * actual_payload.ndim)
             divergence = _divergence("metadata_mismatch", expected, actual)
             break
         mismatch = _first_array_mismatch(expected_payload, actual_payload)
@@ -187,6 +199,119 @@ def _compare_chunk_events(
         "candidate_values": sum(_chunk_size(event) for event in candidate_events),
         "first_divergence": divergence,
     }
+
+
+def _compare_mixed_events(
+    reference_events: list[TraceEvent],
+    candidate_events: list[TraceEvent],
+    reference_directory: Path,
+    candidate_directory: Path,
+) -> dict[str, Any] | None:
+    """Compare homogeneous chunk/scalar traces without expanding chunk payloads."""
+    reference_types = {event.event_type for event in reference_events}
+    candidate_types = {event.event_type for event in candidate_events}
+    if {frozenset(reference_types), frozenset(candidate_types)} != {
+        frozenset({"scalar"}),
+        frozenset({"tensor_chunk"}),
+    }:
+        return None
+    chunks_are_reference = reference_types == {"tensor_chunk"}
+    chunks = reference_events if chunks_are_reference else candidate_events
+    scalars = candidate_events if chunks_are_reference else reference_events
+    chunk_directory = (
+        reference_directory if chunks_are_reference else candidate_directory
+    )
+    total_chunk_values = sum(_chunk_size(event) for event in chunks)
+    matched_values = 0
+    divergence: Divergence | None = None
+    for scalar_event in scalars:
+        assert scalar_event.coordinate is not None and scalar_event.value is not None
+        scalar = AlignedValue(
+            scalar_event, tuple(scalar_event.coordinate), scalar_event.value
+        )
+        chunk_value = _value_from_chunks(chunks, chunk_directory, scalar)
+        if chunk_value is None:
+            divergence = _divergence(
+                "unexpected_candidate_value"
+                if chunks_are_reference
+                else "missing_candidate_value",
+                scalar if not chunks_are_reference else None,
+                scalar if chunks_are_reference else None,
+            )
+            break
+        expected = chunk_value if chunks_are_reference else scalar
+        actual = scalar if chunks_are_reference else chunk_value
+        if not _metadata_compatible(expected.event, actual.event):
+            divergence = _divergence("metadata_mismatch", expected, actual)
+            break
+        if expected.value != actual.value:
+            divergence = _divergence("value_mismatch", expected, actual)
+            break
+        matched_values += 1
+    if divergence is None and len(scalars) < total_chunk_values:
+        missing = _chunk_value_at_offset(chunks, chunk_directory, len(scalars))
+        divergence = _divergence(
+            "missing_candidate_value"
+            if chunks_are_reference
+            else "unexpected_candidate_value",
+            missing if chunks_are_reference else None,
+            missing if not chunks_are_reference else None,
+        )
+    return {
+        "matched_values": matched_values,
+        "reference_values": total_chunk_values
+        if chunks_are_reference
+        else len(scalars),
+        "candidate_values": len(scalars)
+        if chunks_are_reference
+        else total_chunk_values,
+        "first_divergence": divergence,
+    }
+
+
+def _value_from_chunks(
+    chunks: list[TraceEvent], directory: Path, scalar: AlignedValue
+) -> AlignedValue | None:
+    scalar_key = _semantic_key(scalar)[:3]
+    for chunk in chunks:
+        assert chunk.start_coordinate is not None and chunk.chunk_shape is not None
+        probe = AlignedValue(chunk, tuple(chunk.start_coordinate), 0)
+        if _semantic_key(probe)[:3] != scalar_key:
+            continue
+        if all(
+            start <= coordinate < start + size
+            for coordinate, start, size in zip(
+                scalar.coordinate,
+                chunk.start_coordinate,
+                chunk.chunk_shape,
+                strict=True,
+            )
+        ):
+            local = tuple(
+                coordinate - start
+                for coordinate, start in zip(
+                    scalar.coordinate, chunk.start_coordinate, strict=True
+                )
+            )
+            return _array_value(chunk, _load_chunk(chunk, directory), local)
+    return None
+
+
+def _chunk_value_at_offset(
+    chunks: list[TraceEvent], directory: Path, offset: int
+) -> AlignedValue:
+    for chunk in chunks:
+        size = _chunk_size(chunk)
+        if offset < size:
+            assert chunk.chunk_shape is not None
+            local = np.unravel_index(offset, tuple(chunk.chunk_shape))
+            return _array_value(
+                chunk,
+                _load_chunk(chunk, directory),
+                tuple(int(value) for value in local),
+            )
+        offset -= size
+    raise AlignmentError("Mixed trace offset exceeds chunk payloads")
 
 
 def _index_chunks(events: list[TraceEvent]) -> dict[SemanticKey, TraceEvent]:
@@ -233,9 +358,7 @@ def _first_array_mismatch(
             reference_flat[start:stop] != candidate_flat[start:stop]
         )
         if unequal.size:
-            coordinate = np.unravel_index(
-                start + int(unequal[0]), reference.shape
-            )
+            coordinate = np.unravel_index(start + int(unequal[0]), reference.shape)
             return tuple(int(index) for index in coordinate)
     return None
 
@@ -248,9 +371,7 @@ def _array_value(
     assert event.start_coordinate is not None
     coordinate = tuple(
         start + offset
-        for start, offset in zip(
-            event.start_coordinate, local_coordinate, strict=True
-        )
+        for start, offset in zip(event.start_coordinate, local_coordinate, strict=True)
     )
     return AlignedValue(event, coordinate, payload[local_coordinate].item())
 

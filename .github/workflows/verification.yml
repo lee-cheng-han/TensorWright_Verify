@@ -1,0 +1,36 @@
+name: verification
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: make lint
+      - run: make test
+
+  rtl-and-demo:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y verilator
+      - run: python -m pip install -c constraints-demo.txt -e .
+      - run: make lint-rtl
+      - run: make test-rtl
+      - run: make demo DEMO_ARGS="--pace 0"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tensorwright-demo-report
+          path: build/demo/tensorwright-demo-report.zip
