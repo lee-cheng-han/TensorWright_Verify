@@ -76,6 +76,11 @@ module tb_arithmetic_core;
                     @(posedge clk_i);
                     #1;
                 end
+                valid_i = 1'b0;
+                while (!valid_o) begin
+                    @(posedge clk_i);
+                    #1;
+                end
                 assert (valid_o) else
                     $fatal(1, "missing valid at vector %0d", vector_count);
                 assert (!overflow_o) else

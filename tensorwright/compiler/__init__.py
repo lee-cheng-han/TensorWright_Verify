@@ -24,6 +24,12 @@ from tensorwright.compiler.quantization import (
     execute_float,
     execute_quantized,
 )
+from tensorwright.compiler.workflow import (
+    compile_onnx_bundle,
+    inspect_bundle,
+    inspect_bundle_json,
+    load_calibration_npz,
+)
 
 __all__ = [
     "CompilerError",
@@ -49,4 +55,8 @@ __all__ = [
     "build_bundle",
     "load_bundle",
     "validate_bundle",
+    "compile_onnx_bundle",
+    "inspect_bundle",
+    "inspect_bundle_json",
+    "load_calibration_npz",
 ]

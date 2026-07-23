@@ -1,10 +1,10 @@
 # Supported operators
 
 The MVP uses an explicit whitelist. Encountering any other ONNX operation is a
-compile-time error that identifies the node and operation and suggests exporting a
-supported graph or using a future CPU fallback.
+compile-time error that identifies the node and operation. Supported non-RTL operations
+are explicitly assigned to the ARM fallback.
 
-| Operation | Planned MVP lowering |
+| Operation | Current lowering |
 | --- | --- |
 | `Conv` | FPGA accelerator |
 | `Relu` | Fuse into FPGA post-processing |
@@ -17,8 +17,9 @@ supported graph or using a future CPU fallback.
 | `Softmax` | ARM fallback |
 | `Constant` | Extract into compiler-owned tensor data |
 
-Initial graphs must have batch size one and static shapes. The planned convolution
-subset uses 1x1 or 3x3 kernels, stride one or two, and static zero padding. Dynamic
+Initial graphs must have batch size one and static shapes. The generic software convolution
+path supports static parameters; the native RTL bundle runner currently supports valid
+3x3, stride-one `1x3x5x5 -> 1x2x3x3` convolution. Dynamic
 shapes, recurrent networks, attention, transformers, training, and floating-point RTL
 are outside MVP scope.
 
@@ -28,9 +29,9 @@ layout `[C]` or `[1,C,1,1]`. Other `Add` nodes remain visible and compiler-assig
 later execution support is claimed for them yet. BatchNormalization similarly remains
 visible unless every parameter is constant and its Conv producer is safe to rewrite.
 
-Operation-level validation such as convolution kernel and stride restrictions remains
-future work. Nodes in custom domains are rejected even when their short operation name
-matches the whitelist.
+Nodes in custom domains are rejected even when their short operation name matches the
+whitelist. Native RTL execution rejects bundles outside its documented fixed-shape contract
+before simulation.
 
 Under TensorWright Verify, operator support has three separate meanings: the Python
 reference can produce semantic traces, the custom RTL can expose a corresponding stage,

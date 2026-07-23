@@ -3,15 +3,19 @@
 TensorWright Verify answers why quantized software and accelerator execution disagree:
 
 ```text
-ONNX or QONNX model
-        |
-        +-> quantized Python reference -> canonical reference trace --+
-        |                                                       future |
-        +-> custom RTL -> Cocotb simulation -> hardware trace --------+-> alignment
-                                                                         -> first divergence
-                                                                         -> diagnosis
-                                                                         -> minimization
-                                                                         -> regression
+ONNX model -> typed IR -> optimization -> calibration/INT8 quantization
+                                        |
+                                        +-> .twmodel bundle
+                                             |             |
+                                             |             +-> ARM fallback
+                                             +-> native RTL convolution
+                                                  |
+Python reference trace ----------------------+    +-> Verilator trace
+                                             \   /
+                                              alignment
+                                                -> diagnosis
+                                                -> minimization
+                                                -> regression/dashboard
 ```
 
 Milestones 11–19 implement the canonical trace contract, Python-reference writer,
@@ -28,11 +32,10 @@ shapes/layouts, fused groups, and quantization metadata. The integer backend sup
 golden values. `.twmodel` retains graphs, packed constants, schedules, reference vectors,
 and interface versions. The runtime provides register/stream orchestration, seeded
 backpressure, timeouts, CPU fallbacks, and a future insertion point for hardware events.
-The custom SystemVerilog accelerator remains the primary integration and controlled
-fault-injection target.
+The custom SystemVerilog accelerator is the native FPGA backend and controlled
+fault-injection target. The fixed-shape bundle runner decodes compiler-generated binary
+constants and quantization records and executes them on this RTL.
 
-Compilation is now a lower-level workload and metadata preparation mechanism, not the
-primary product. Existing bundle and `simulate` workflows remain compatible. FINN full
-execution-context and hls4ml C-simulation traces are supported; future adapters must
-convert real tested traces into the same
-canonical schema.
+Compilation, execution, and verification are equal parts of the product. FINN full-context
+and hls4ml C-simulation traces are supported through adapters, while only the native
+TensorWright convolution backend claims cycle-level RTL evidence.

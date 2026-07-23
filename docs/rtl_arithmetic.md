@@ -26,8 +26,11 @@ not fit the 7-bit interface.
 Sequential units use active-low synchronous reset and explicit `valid_i`/`valid_o`.
 The integrated nine-lane core accepts one group of nine activation/weight pairs per
 valid cycle. `clear_i` starts a new channel accumulation and `last_i` sends the complete
-accumulator through the one-register post-processing stage. Milestone 6 will wrap this
-arithmetic contract in ready/valid streaming and stall behavior.
+accumulator through registered operand, product, balanced-reduction, and post-processing
+stages. Requantization separately registers bias addition, the 64-bit product, magnitude,
+rounding, and activation/saturation. This pipeline meets the repository's 100 MHz
+post-synthesis constraint for the Zynq-7020. Its additional latency is carried by `valid_o`;
+callers must not assume a single-cycle response.
 
 ## Verification
 

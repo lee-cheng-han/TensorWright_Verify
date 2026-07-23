@@ -9,7 +9,7 @@ q = round_ties_away_from_zero(real_value / scale)
 q = clamp(q, -128, 127)
 ```
 
-The compiler will approximate `(input_scale * weight_scale) / output_scale` with a
+The compiler approximates `(input_scale * weight_scale) / output_scale` with a
 fixed-point multiplier and shift. Post-processing order is INT32 bias addition,
 fixed-point multiply, rounded arithmetic shift, optional ReLU, then signed INT8
 saturation.
@@ -35,6 +35,6 @@ Milestone 4 calibration and graph quantization are specified in
 accuracy values always come from the samples supplied to that compilation run.
 
 These numerical rules are also the golden evidence source for TensorWright Verify.
-Future deterministic diagnosis will distinguish signedness, saturation, rounding,
-arithmetic-shift, scale, and bias-placement failures against this specification.
-Milestone 11 records scales and zero points but does not classify causes.
+Deterministic diagnosis distinguishes supported signedness, saturation, rounding,
+arithmetic-shift, scale, and bias-placement failures against this specification and
+provides evidence plus recommended checks.

@@ -106,9 +106,9 @@ def _memory_plan(graph: Graph) -> dict[str, Any]:
     }
 
 
-def _pack_constants(graph: Graph) -> tuple[dict[str, bytes], dict[str, dict[str, int]]]:
+def _pack_constants(graph: Graph) -> tuple[dict[str, bytes], dict[str, dict[str, Any]]]:
     blobs = {"weights": bytearray(), "biases": bytearray(), "constants": bytearray()}
-    locations: dict[str, dict[str, int]] = {}
+    locations: dict[str, dict[str, Any]] = {}
     linear_inputs = {
         name: kind
         for operation in graph.operations
@@ -171,7 +171,9 @@ def _pack_quantization(graph: Graph) -> tuple[bytes, dict[str, int]]:
             )
         offsets[operation.name] = len(data)
         for multiplier, shift in zip(multipliers, shifts, strict=True):
-            data.extend(struct.pack("<IB3x", int(multiplier), int(shift)))
+            if not isinstance(multiplier, int) or not isinstance(shift, int):
+                raise BundleValidationError("Quantization parameters must be integers")
+            data.extend(struct.pack("<IB3x", multiplier, shift))
     return bytes(data), offsets
 
 
@@ -179,7 +181,7 @@ def _command(
     operation: Operation,
     index: int,
     memory_offsets: dict[str, int],
-    constant_locations: dict[str, dict[str, int]],
+    constant_locations: dict[str, dict[str, Any]],
     quant_offsets: dict[str, int],
 ) -> bytes:
     opcode = {"Conv": 1, "MaxPool": 2, "View": 3, "Gemm": 4, "Softmax": 5}.get(

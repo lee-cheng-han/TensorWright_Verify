@@ -73,3 +73,9 @@ operation identity, and the shared NPZ conversion path provides scalar and chunk
 The integration script compiles and traces a real hls4ml Dense/Activation graph and verifies
 the resulting canonical values. It accurately identifies C simulation and does not claim
 RTL timing evidence. This completes the currently defined TensorWright Verify roadmap.
+
+The subsequent board-independent release hardening adds the public ONNX-to-`.twmodel`
+compile and inspection workflow, bundle-driven real RTL execution, a recognizable model
+demo, repeatable benchmarking, 100 MHz Zynq-7020 routed implementation, and CI coverage. See
+[board-independent release status](board_independent_release.md) for the tested boundary and
+the short list of physical-board deployment work that remains.

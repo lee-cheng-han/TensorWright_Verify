@@ -191,6 +191,8 @@ def _reference_convolution_trace(
     *,
     source_operation_id: str = "synthetic:conv_0",
     model_id: str = "rtl_convolution_regression",
+    operation_name: str = "conv_0",
+    tensor_name: str = "conv_0_output",
 ) -> Path:
     events = []
     for sequence, value in enumerate(values):
@@ -207,11 +209,11 @@ def _reference_convolution_trace(
                 compiled_operation_id="compiled:op_0000",
                 fused_source_operation_ids=[],
                 graph_stage="post_quantization",
-                operation_name="conv_0",
+                operation_name=operation_name,
                 operation_type="Conv",
                 hardware_stage="software_operation_output",
                 trace_point="operation_output",
-                tensor_name="conv_0_output",
+                tensor_name=tensor_name,
                 shape=[1, 2, 3, 3],
                 layout="NCHW",
                 dtype="int8",

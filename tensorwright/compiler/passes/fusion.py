@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 
@@ -110,7 +111,7 @@ class FuseConvBiasRelu:
         return True
 
 
-def _channel_bias(value: object, channels: int) -> np.ndarray[object, object] | None:
+def _channel_bias(value: object, channels: int) -> np.ndarray[Any, Any] | None:
     try:
         array = np.asarray(value)
     except (TypeError, ValueError):

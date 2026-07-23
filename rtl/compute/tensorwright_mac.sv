@@ -5,12 +5,12 @@ module tensorwright_mac #(
     parameter int DATA_WIDTH = 8,
     parameter int ACC_WIDTH = 32
 ) (
-    input  logic                         clk_i,
-    input  logic                         rst_ni,
-    input  logic                         valid_i,
-    input  logic                         clear_i,
-    input  logic signed [DATA_WIDTH-1:0] activation_i,
-    input  logic signed [DATA_WIDTH-1:0] weight_i,
+    input  wire logic                         clk_i,
+    input  wire logic                         rst_ni,
+    input  wire logic                         valid_i,
+    input  wire logic                         clear_i,
+    input  wire logic signed [DATA_WIDTH-1:0] activation_i,
+    input  wire logic signed [DATA_WIDTH-1:0] weight_i,
     output logic                         valid_o,
     output logic signed [ACC_WIDTH-1:0]  accumulator_o,
     output logic                         overflow_o

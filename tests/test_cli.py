@@ -16,7 +16,7 @@ class CliTest(unittest.TestCase):
         ):
             main(["--version"])
 
-        self.assertEqual(output.getvalue(), "tensorwright 0.0.0\n")
+        self.assertEqual(output.getvalue(), "tensorwright 0.1.0\n")
 
     def test_help(self) -> None:
         output = io.StringIO()

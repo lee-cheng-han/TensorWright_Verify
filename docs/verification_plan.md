@@ -5,6 +5,11 @@ framework FP32 versus ONNX FP32, ONNX FP32 versus quantized software, and quanti
 software versus RTL simulation. Future board deployment adds RTL simulation versus FPGA
 hardware. Results from one boundary are never inferred for another.
 
+The board-ready regression also compiles an ONNX convolution into `.twmodel`, decodes its
+actual packed constants and quantization records, and executes that exact invocation on
+Verilator RTL. This prevents compiler and RTL correctness from being established only by
+separate fixtures.
+
 Milestone 0 tests installation-facing CLI behavior. Milestone 1 includes directed
 arithmetic edge cases, small multi-channel convolution, validation failures, and
 deterministic randomized requantization and convolution tests. Seeds are fixed and

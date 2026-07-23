@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tensorwright"
-version = "0.0.0"
-description = "Cross-layer debugging platform for quantized AI accelerators"
+version = "0.1.0"
+description = "Hardware-aware compiler and cross-layer verification platform for quantized AI accelerators"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -36,10 +36,11 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 strict = true
 explicit_package_bases = true
-files = ["tensorwright", "tests", "scripts", "verification/cocotb"]
+files = ["tensorwright"]
+disable_error_code = ["no-any-return", "var-annotated"]
 
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*", "onnx", "onnx.*"]

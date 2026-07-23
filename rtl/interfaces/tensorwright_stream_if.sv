@@ -4,8 +4,8 @@
 interface tensorwright_stream_if #(
     parameter int DATA_WIDTH = 8
 ) (
-    input logic clk_i,
-    input logic rst_ni
+    input wire logic clk_i,
+    input wire logic rst_ni
 );
     logic                  tvalid;
     logic                  tready;

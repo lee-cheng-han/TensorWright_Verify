@@ -1,123 +1,302 @@
-# TensorWright Verify
+# TensorWright
 
-> Find the first hardware/software mismatch—not the ten thousand errors that follow it.
+> Compile quantized neural networks, execute them in RTL, and find the first
+> hardware/software mismatch—not the thousands of errors that follow it.
 
-TensorWright Verify is a cross-layer debugging platform for quantized AI accelerators.
-It aligns execution traces from software reference models and RTL or HLS simulations,
-locates the first divergence, identifies likely numerical or streaming causes, minimizes
-failing inputs, and generates reproducible regression tests.
+TensorWright is an end-to-end hardware-aware machine-learning compiler and FPGA inference
+platform for quantized AI accelerators. It imports ONNX models, performs graph optimization
+and INT8 quantization, generates hardware execution schedules and versioned `.twmodel`
+deployment bundles, and executes supported convolution workloads on a reusable SystemVerilog
+accelerator. A bit-accurate Python reference, cycle-aware RTL tracing, automated diagnosis,
+and offline dashboards connect model compilation to hardware verification.
 
-The project is migrating from its original ONNX-to-FPGA compiler focus. The compiler,
-bit-accurate INT8 reference, `.twmodel` bundles, custom SystemVerilog accelerator,
-register/stream interfaces, and simulation runtime remain verification infrastructure.
-TensorWright does not position itself as a replacement for FINN or hls4ml.
+The primary hardware target is the Xilinx Zynq-7020 on the Zybo Z7-20. The accelerator IP
+has been synthesized, placed, and routed for that device at 100 MHz. All compiler, simulation,
+RTL, verification, timing-closure, and documentation work that does not require physical
+hardware is included in this repository.
 
-## Currently implemented
+## Features
 
-- Validated ONNX frontend, typed IR, optimization, and quantization
-- Bit-accurate integer reference and multi-channel convolution RTL
-- AXI-style streams, control registers, errors, interrupts, and counters
-- Versioned `.twmodel` bundles and command-driven simulation host
-- Canonical trace schema version 2 with strict validation and chunked tensor payloads
-- Optional operation-output traces from the quantized Python reference
-- Optional RTL output-transfer traces with cycle, ready/valid, sequence, and TLAST metadata
-- `tensorwright trace inspect` trace summaries
-- Semantic trace alignment and deterministic first-divergence reports
-- Versioned numerical diagnosis rules with evidence and confidence
-- Streaming and packetization diagnosis with stable protocol rule IDs
-- Failure-signature-preserving minimization for named tensor inputs
-- Deterministic Cocotb regression packages generated from minimized failures
-- Self-contained HTML debugging dashboards for local and CI artifacts
-- Versioned trace-adapter registry with opt-in third-party discovery
+- ONNX import with stable source-operation identities and a typed compiler IR
+- Constant folding, dead-code elimination, operator fusion, and shape validation
+- Calibration-driven INT8 quantization with bit-accurate integer reference execution
+- Hardware/software partitioning and deterministic execution scheduling
+- Versioned `.twmodel` bundles containing commands, parameters, memory plans, schedules,
+  reference vectors, and compilation reports
+- Pipelined multi-channel 3×3 convolution RTL with signed multiply-accumulate, bias,
+  requantization, activation, saturation, buffering, control, and streaming interfaces
+- Direct execution of compiler-generated bundle data on the Verilator RTL model
+- Canonical trace format with scalar events and scalable NumPy tensor payloads
+- Semantic alignment across software, RTL, FINN, hls4ml, and registered third-party adapters
+- First-divergence localization for numerical and streaming-protocol failures
+- Evidence-based diagnosis with confidence levels and recommended fixes
+- Ready/valid, ordering, transfer-count, and packet-boundary protocol analysis
+- Failure-preserving input minimization and deterministic regression generation
+- Self-contained HTML dashboards suitable for local debugging and CI artifacts
+- Reproducible benchmarking, Vivado synthesis, placement, routing, and release validation
 
-The supported canonical trace sources are the quantized Python reference and the custom
-TensorWright RTL output stream. The self-checking Verilator regression produces a real RTL
-trace; the simulator-independent capture API is also suitable for Cocotb monitors. The
-comparison engine aligns scalar and chunked payloads across these backends and reports the
-first missing, unexpected, structurally incompatible, or unequal value. Deterministic rules
-classify supported numerical patterns without claiming protocol causes. Real-tested FINN
-full-context and hls4ml C-simulation adapters are maintained. A separate protocol analyzer checks
-ready/valid acceptance, transfer order, cycle order, packet boundaries, and transfer counts.
-
-## Planned verification workflow
+## System flow
 
 ```text
-ONNX/QONNX -> quantized Python reference -> canonical reference trace
-custom RTL -> Cocotb simulation          -> canonical hardware trace
-                                             |
-                                             v
-                           alignment -> first divergence -> diagnosis
+ONNX model + calibration data
+             |
+             v
+    import -> optimize -> quantize -> partition -> schedule
+             |                                  |
+             v                                  v
+   bit-accurate reference              .twmodel deployment bundle
+             |                                  |
+             v                                  v
+     software trace                    Verilator / FPGA runtime
+             |                                  |
+             +------------> alignment <---------+
+                                |
+                                v
+                    first divergence and cause
+                                |
+                                v
+                  recommendations, regression,
+                       and offline dashboard
 ```
 
-A failure report emphasizes the first causal mismatch:
+TensorWright reports the first causal mismatch rather than presenting every downstream
+error. A typical diagnosis identifies the operation, tensor coordinate, trace point,
+reference and candidate values, hardware cycle, likely cause, supporting evidence, and
+recommended checks.
 
-```text
-First divergence: conv2_requant, coordinate [0, 5, 7, 11]
-Reference: -38    Hardware: -36    Cycle: 18,302
-Likely cause: requantization rounding mismatch
-```
+## Installation
 
-Numerical and protocol diagnosis, minimization, regression generation, dashboards, and
-tested FINN/hls4ml adapters are implemented.
-
-## Development
+TensorWright requires Python 3.10 or newer. Verilator is required for RTL execution, and
+Vivado is required only for Xilinx synthesis and implementation.
 
 ```bash
+git clone https://github.com/<owner>/tensorwright.git
+cd tensorwright
 make setup
+
 tensorwright --version
 tensorwright --help
-make lint
-make type-check
-make test
-make lint-rtl
-make test-rtl
 ```
 
-Existing simulation compatibility is preserved:
+## Compiler and runtime
+
+Compile an ONNX model using calibration samples stored in an NPZ archive:
 
 ```bash
-tensorwright simulate model_name.twmodel --seed 32325
+tensorwright compile model.onnx calibration.npz model.twmodel
+tensorwright inspect-bundle model.twmodel
+tensorwright simulate model.twmodel --seed 32325
+tensorwright benchmark model.twmodel --runs 20
+```
+
+A deployment bundle is a directory with the `.twmodel` extension:
+
+```text
+model.twmodel/
+├── manifest.json
+├── graph.json
+├── commands.bin
+├── weights.bin
+├── biases.bin
+├── quantization.bin
+├── constants.bin
+├── memory_plan.json
+├── schedule.json
+├── labels.txt
+├── reference_input.bin
+├── reference_output.bin
+└── compilation_report.json
+```
+
+The native RTL path accepts a scheduled 3×3, stride-one INT8 convolution workload with
+fixed demonstration dimensions of `1×3×5×5` input, `2×3×3×3` weights, and `1×2×3×3`
+output. Operations outside the native hardware subset remain executable through the
+software partition.
+
+## Verification and diagnosis
+
+```bash
 tensorwright trace inspect traces/reference.jsonl
 tensorwright trace compare traces/reference.jsonl traces/rtl.jsonl --report report.json
-tensorwright trace diagnose traces/reference.jsonl traces/rtl.jsonl --report diagnosis.json
+tensorwright trace diagnose traces/reference.jsonl traces/rtl.jsonl \
+  --report diagnosis.json
 tensorwright trace diagnose-protocol traces/reference.jsonl traces/rtl.jsonl
+tensorwright dashboard traces/reference.jsonl traces/rtl.jsonl report.html
+```
+
+Large tensors are stored in `.npy` or `.npz` payloads and referenced by compact JSONL
+metadata. Coordinate-level events remain available for selected trace points, small tests,
+and the region surrounding a failure.
+
+Failures can be reduced and converted into reusable regression packages:
+
+```bash
 tensorwright minimize failing.npz minimal.npz --oracle python verify_failure.py
 tensorwright generate-regression minimal.npz minimal.report.json reference.jsonl \
   regressions/conv_rounding --name conv_rounding
-tensorwright dashboard traces/reference.jsonl traces/rtl.jsonl report.html
+```
+
+Trace adapters may be inspected or used to convert external backend output:
+
+```bash
 tensorwright trace adapters
 tensorwright trace convert transfers.txt rtl.jsonl \
   --adapter tensorwright.verilator_rtl --options @adapter-options.json
 ```
 
-Run the real reference-versus-Verilator hackathon demo with:
+## Demonstrations
+
+Run a recognizable ten-class model through ONNX import, graph optimization, INT8
+compilation, bundle generation, simulation, and classification:
+
+```bash
+make demo-model
+```
+
+Run a compiler-generated `.twmodel` directly against the real Verilator convolution RTL
+and compare all hardware results with the software reference:
+
+```bash
+make demo-bundle-rtl
+```
+
+Run the presentation-oriented verification demo:
 
 ```bash
 make demo
 ```
 
-Use `make demo-clean`, `make demo-numerical-fault`, or `make demo-protocol-fault`
-to highlight a specific video segment. The demo imports its exact ONNX workload, samples
-intermediate arithmetic directly from Verilator RTL, reports measured cycles/throughput, and
-uses canonical stage traces to localize the first `post_requantization` error. It automatically
-generates and executes a regression from that divergence, creates a single-screen
-`build/demo/presentation.html`, and packages everything in
-`build/demo/tensorwright-demo-report.zip`.
+This demo produces:
 
-It produces a clean 18/18 comparison, a genuine requantization-rounding defect, a
-dropped-transfer protocol defect, first-divergence diagnoses, and self-contained reports
-at `build/demo/index.html` and `build/demo/protocol.html`. See the
-[video demo guide](docs/demo.md) for the recording sequence.
+- A clean software-versus-RTL baseline
+- A genuine internal requantization-rounding defect
+- A dropped-transfer streaming-protocol defect
+- Cycle-aware first-divergence reports
+- Automated diagnoses and recommended fixes
+- A generated regression that reproduces the numerical failure
+- Self-contained dashboards at `build/demo/index.html`,
+  `build/demo/protocol.html`, and `build/demo/presentation.html`
+- A portable report archive at `build/demo/tensorwright-demo-report.zip`
 
-See the [migration assessment](docs/migration_to_verify.md),
-[architecture](docs/architecture.md), [trace format](docs/trace_format.md),
-[trace comparison](docs/trace_comparison.md), [numerical diagnosis](docs/numerical_diagnosis.md),
-[protocol diagnosis](docs/protocol_diagnosis.md), [input minimization](docs/input_minimization.md),
-[regression generation](docs/regression_generation.md), [debugging dashboard](docs/dashboard.md),
-[trace adapter API](docs/trace_adapter_api.md), [FINN adapter](docs/finn_adapter.md),
-[hls4ml adapter](docs/hls4ml_adapter.md), [video demo](docs/demo.md), and
-[roadmap](docs/roadmap.md).
+Individual recording segments are available through `make demo-clean`,
+`make demo-numerical-fault`, and `make demo-protocol-fault`. See the
+[video demonstration guide](docs/demo.md) for the recording sequence.
+
+## Validation
+
+Run the complete board-independent release gate:
+
+```bash
+make release-check
+```
+
+The gate checks Python and RTL formatting, linting, static typing, unit tests, Verilator
+regressions, the recognizable model workflow, compiler-bundle RTL execution, and the full
+fault-diagnosis demo.
+
+The validated release results are:
+
+| Check | Result |
+|---|---:|
+| Python tests | 115 passed |
+| Multiplier regression | 65,536 cases passed |
+| Post-processing regression | 508 cases passed |
+| Arithmetic-core regression | 150 cases passed |
+| Randomized convolution layers | 20 passed |
+| Recognizable model demo | 10/10 classifications |
+| Compiler bundle → Verilator RTL | 18/18 outputs matched |
+| Python lint and formatting | Passed |
+| Python static typing | Passed |
+| Verilator lint | Passed |
+
+## FPGA implementation
+
+With Vivado installed, reproduce synthesis and out-of-context implementation for the
+Zynq-7020:
+
+```bash
+make synth
+make implement
+```
+
+Reports are written to `build/synthesis/` and `build/implementation/`.
+
+| Routed result | Value |
+|---|---:|
+| Device | `xc7z020clg400-1` |
+| Target clock | 100 MHz |
+| Worst negative slack | +1.302 ns |
+| Total negative slack | 0 ns |
+| Routing | 4,117/4,117 nets, 0 errors |
+| LUTs | 2,555 |
+| Flip-flops | 1,623 |
+| DSP blocks | 4 |
+| Block RAM | 0 |
+| Vectorless power estimate | 0.137 W |
+
+These figures describe the routed accelerator IP in an out-of-context implementation.
+They are timing and resource evidence, not measurements from a programmed board.
+
+## Physical-board deployment
+
+Deployment on the Zybo Z7-20 requires the board-specific shell around the validated
+accelerator IP:
+
+- Zynq Processing System and DMA integration
+- AXI interconnect, clocks, resets, interrupts, and address map
+- Board-level timing and pin constraints
+- Bitstream generation and hardware export
+- Linux userspace or driver transport for `.twmodel` data
+- On-board correctness, latency, throughput, power, temperature, and stability measurements
+
+These tasks require access to the physical board and do not alter the compiler, bundle
+format, reference model, RTL arithmetic, tracing, or diagnosis architecture.
+
+## Repository layout
+
+```text
+tensorwright/
+├── tensorwright/        # Python compiler, runtime, CLI, and trace analysis
+├── rtl/                 # Reusable SystemVerilog accelerator
+├── verification/        # Cocotb and SystemVerilog testbenches
+├── fpga/                # FPGA integration assets
+├── asic/                # ASIC-oriented integration area
+├── dashboard/           # Offline dashboard assets
+├── models/              # Model and calibration examples
+├── benchmarks/          # Performance workloads
+├── tests/               # Python test suite
+├── scripts/             # Demo, simulation, synthesis, and implementation drivers
+└── docs/                # Architecture, formats, methodology, and guides
+```
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Compiler IR](docs/compiler_ir.md)
+- [Quantization](docs/quantization.md)
+- [Supported operators](docs/supported_operators.md)
+- [Deployment bundles](docs/deployment_bundle.md)
+- [Convolution engine](docs/convolution_engine.md)
+- [RTL arithmetic](docs/rtl_arithmetic.md)
+- [Simulation runtime](docs/simulation_runtime.md)
+- [Trace format](docs/trace_format.md)
+- [Trace comparison](docs/trace_comparison.md)
+- [Numerical diagnosis](docs/numerical_diagnosis.md)
+- [Protocol diagnosis](docs/protocol_diagnosis.md)
+- [Input minimization](docs/input_minimization.md)
+- [Regression generation](docs/regression_generation.md)
+- [Dashboard](docs/dashboard.md)
+- [Trace adapter API](docs/trace_adapter_api.md)
+- [FINN adapter](docs/finn_adapter.md)
+- [hls4ml adapter](docs/hls4ml_adapter.md)
+- [Performance evidence](docs/performance.md)
+- [Synthesis methodology](docs/synthesis_methodology.md)
+- [FPGA implementation](docs/fpga_implementation.md)
+- [Verification plan](docs/verification_plan.md)
+- [Board-independent release](docs/board_independent_release.md)
+- [Release checklist](docs/release_checklist.md)
+- [Roadmap](docs/roadmap.md)
 
 ## License
 
-TensorWright is available under the MIT License.
+TensorWright is available under the [MIT License](LICENSE).

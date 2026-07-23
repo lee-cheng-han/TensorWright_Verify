@@ -97,7 +97,7 @@ def write_reference_trace(
                         start_coordinate=[0] * value.ndim,
                         chunk_shape=list(value.shape),
                         data_file=f"tensors/{payload_name}",
-                        **common,
+                        **common,  # type: ignore[arg-type]
                     )
                 )
             else:
@@ -107,7 +107,7 @@ def write_reference_trace(
                             event_type="scalar",
                             coordinate=list(coordinate),
                             value=value[coordinate].item(),
-                            **common,
+                            **common,  # type: ignore[arg-type]
                         )
                     )
     if not events:

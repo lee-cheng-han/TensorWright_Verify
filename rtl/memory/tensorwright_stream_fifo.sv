@@ -7,14 +7,14 @@ module tensorwright_stream_fifo #(
     localparam int POINTER_WIDTH = (DEPTH <= 2) ? 1 : $clog2(DEPTH),
     localparam int COUNT_WIDTH = $clog2(DEPTH + 1)
 ) (
-    input  logic                  clk_i,
-    input  logic                  rst_ni,
-    input  logic                  s_tvalid_i,
+    input  wire logic                  clk_i,
+    input  wire logic                  rst_ni,
+    input  wire logic                  s_tvalid_i,
     output logic                  s_tready_o,
-    input  logic [DATA_WIDTH-1:0] s_tdata_i,
-    input  logic                  s_tlast_i,
+    input  wire logic [DATA_WIDTH-1:0] s_tdata_i,
+    input  wire logic                  s_tlast_i,
     output logic                  m_tvalid_o,
-    input  logic                  m_tready_i,
+    input  wire logic                  m_tready_i,
     output logic [DATA_WIDTH-1:0] m_tdata_o,
     output logic                  m_tlast_o,
     output logic [COUNT_WIDTH-1:0] count_o

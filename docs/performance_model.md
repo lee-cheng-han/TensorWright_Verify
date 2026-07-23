@@ -8,7 +8,7 @@ that require physical hardware.
 | RTL output correctness | Verified in simulation |
 | Simulated cycle count | Measured from RTL simulation |
 | Estimated latency | Derived from cycle count and stated clock |
-| LUT/DSP/BRAM use | Parsed from Vivado synthesis |
+| LUT/DSP/BRAM use | Parsed from Vivado synthesis and implementation |
 | Timing slack | Parsed from Vivado implementation |
 | Real DMA overhead | Requires board |
 | Real ARM runtime overhead | Requires board |
@@ -20,8 +20,8 @@ must always report both inputs and use the word “estimated.” Simulated utili
 `active_compute_cycles / total_simulated_cycles`; it describes the simulated design,
 not physical-board utilization or throughput.
 
-The RTL counters will distinguish total, compute-active, input-stall, output-stall,
+The RTL counters distinguish total, compute-active, input-stall, output-stall,
 weight-loading, produced-output, consumed-input, layer-invocation, executed-MAC, and
-error counts. Counter values become reportable only after their RTL behavior and
-register reads are implemented and tested. End-to-end physical latency, DMA behavior,
+error counts. Their RTL behavior and register reads are implemented and tested.
+End-to-end physical latency, DMA behavior,
 power, and speedup remain unavailable without a board.

@@ -51,6 +51,11 @@ module tb_postprocess;
                 valid_i = 1'b1;
                 @(posedge clk_i);
                 #1;
+                valid_i = 1'b0;
+                while (!valid_o) begin
+                    @(posedge clk_i);
+                    #1;
+                end
                 assert (valid_o) else $fatal(1, "missing valid at vector %0d", count);
                 assert (!overflow_o) else $fatal(1, "overflow at vector %0d", count);
                 assert ($signed(result_o) == expected) else
@@ -62,6 +67,8 @@ module tb_postprocess;
                         $signed(result_o)
                     );
                 count = count + 1;
+                @(posedge clk_i);
+                #1;
             end
         end
         valid_i = 1'b0;

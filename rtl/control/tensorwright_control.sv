@@ -2,19 +2,19 @@
 `default_nettype none
 
 module tensorwright_control (
-    input logic clk_i, input logic rst_ni,
-    input logic [11:0] s_axil_awaddr_i, input logic s_axil_awvalid_i, output logic s_axil_awready_o,
-    input logic [31:0] s_axil_wdata_i, input logic [3:0] s_axil_wstrb_i,
-    input logic s_axil_wvalid_i, output logic s_axil_wready_o,
-    output logic [1:0] s_axil_bresp_o, output logic s_axil_bvalid_o, input logic s_axil_bready_i,
-    input logic [11:0] s_axil_araddr_i, input logic s_axil_arvalid_i, output logic s_axil_arready_o,
+    input wire logic clk_i, input wire logic rst_ni,
+    input wire logic [11:0] s_axil_awaddr_i, input wire logic s_axil_awvalid_i, output logic s_axil_awready_o,
+    input wire logic [31:0] s_axil_wdata_i, input wire logic [3:0] s_axil_wstrb_i,
+    input wire logic s_axil_wvalid_i, output logic s_axil_wready_o,
+    output logic [1:0] s_axil_bresp_o, output logic s_axil_bvalid_o, input wire logic s_axil_bready_i,
+    input wire logic [11:0] s_axil_araddr_i, input wire logic s_axil_arvalid_i, output logic s_axil_arready_o,
     output logic [31:0] s_axil_rdata_o, output logic [1:0] s_axil_rresp_o,
-    output logic s_axil_rvalid_o, input logic s_axil_rready_i,
-    input logic engine_done_i, input logic compute_active_i,
-    input logic input_tvalid_i, input logic input_tready_i,
-    input logic weight_tvalid_i, input logic weight_tready_i,
-    input logic output_tvalid_i, input logic output_tready_i,
-    input logic [31:0] macs_executed_i,
+    output logic s_axil_rvalid_o, input wire logic s_axil_rready_i,
+    input wire logic engine_done_i, input wire logic compute_active_i,
+    input wire logic input_tvalid_i, input wire logic input_tready_i,
+    input wire logic weight_tvalid_i, input wire logic weight_tready_i,
+    input wire logic output_tvalid_i, input wire logic output_tready_i,
+    input wire logic [31:0] macs_executed_i,
     output logic start_o, output logic soft_reset_o, output logic irq_o,
     output logic [31:0] input_height_o, output logic [31:0] input_width_o,
     output logic [31:0] input_channels_o, output logic [31:0] output_channels_o,
@@ -41,7 +41,9 @@ module tensorwright_control (
     endfunction
 
     function automatic logic [31:0] apply_strobes(
-        input logic [31:0] old_value, input logic [31:0] new_value, input logic [3:0] strobes
+        input logic [31:0] old_value,
+        input logic [31:0] new_value,
+        input logic [3:0] strobes
     );
         logic [31:0] result;
         result = old_value;
@@ -113,7 +115,8 @@ module tensorwright_control (
                         end
                     end
                     ADDR_IRQ_STATUS: irq_status <= irq_status & ~wdata_q[1:0];
-                    ADDR_IRQ_ENABLE: irq_enable <= apply_strobes({30'd0, irq_enable}, wdata_q, wstrb_q)[1:0];
+                    ADDR_IRQ_ENABLE:
+                        if (wstrb_q[0]) irq_enable <= wdata_q[1:0];
                     ADDR_INPUT_HEIGHT, ADDR_INPUT_WIDTH, ADDR_INPUT_CHANNELS, ADDR_OUTPUT_CHANNELS,
                     ADDR_KERNEL_CONFIG, ADDR_OUTPUT_HEIGHT, ADDR_OUTPUT_WIDTH, ADDR_FLAGS,
                     ADDR_INPUT_LENGTH, ADDR_WEIGHT_LENGTH, ADDR_OUTPUT_LENGTH: begin

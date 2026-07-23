@@ -1,5 +1,8 @@
 # Migration to TensorWright Verify
 
+> Historical note: this records the Milestone 11 migration decision. Current status is
+> maintained in `board_independent_release.md` and `release_checklist.md`.
+
 ## Repository assessment
 
 The original Milestones 0–10 produced working ONNX validation, typed graph IR,

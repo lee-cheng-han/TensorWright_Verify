@@ -13,14 +13,23 @@ from pathlib import Path
 import numpy as np
 
 from tensorwright import __version__
-from tensorwright.compiler import CompilerError
+from tensorwright.compiler import (
+    CompilerError,
+    compile_onnx_bundle,
+    inspect_bundle_json,
+)
 from tensorwright.dashboard import DashboardError, generate_dashboard
 from tensorwright.minimizer import FailureSignature, MinimizationError, minimize_inputs
 from tensorwright.regression import (
     RegressionGenerationError,
     generate_cocotb_regression,
 )
-from tensorwright.runtime import SimulationConfig, SimulationError, simulate_bundle
+from tensorwright.runtime import (
+    SimulationConfig,
+    SimulationError,
+    benchmark_bundle_json,
+    simulate_bundle,
+)
 from tensorwright.trace import (
     AdapterError,
     AdapterRequest,
@@ -41,8 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tensorwright",
         description=(
-            "Cross-layer debugging and differential verification for "
-            "quantized AI accelerators."
+            "Hardware-aware compilation and cross-layer verification for quantized "
+            "AI accelerators."
         ),
     )
     parser.add_argument(
@@ -51,6 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command")
+    compile_command = subparsers.add_parser(
+        "compile", help="compile an ONNX model into a validated .twmodel bundle"
+    )
+    compile_command.add_argument("model", help="input ONNX model")
+    compile_command.add_argument("calibration", help="named calibration tensors in NPZ")
+    compile_command.add_argument("output", help="destination .twmodel directory")
+    compile_command.add_argument(
+        "--labels", help="optional UTF-8 file containing one class label per line"
+    )
+    inspect_bundle_command = subparsers.add_parser(
+        "inspect-bundle", help="validate and summarize a .twmodel deployment bundle"
+    )
+    inspect_bundle_command.add_argument("bundle")
     simulate = subparsers.add_parser(
         "simulate", help="execute a validated .twmodel bundle in the simulation host"
     )
@@ -58,6 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
     simulate.add_argument("--seed", type=int, default=0x7E45)
     simulate.add_argument("--timeout-cycles", type=int, default=1_000_000)
     simulate.add_argument(
+        "--no-backpressure", action="store_true", help="keep modeled stream ready high"
+    )
+    benchmark = subparsers.add_parser(
+        "benchmark", help="measure repeatable host-modeled bundle performance"
+    )
+    benchmark.add_argument("bundle", help="path to a .twmodel deployment directory")
+    benchmark.add_argument("--runs", type=int, default=10)
+    benchmark.add_argument("--seed", type=int, default=0x7E45)
+    benchmark.add_argument(
         "--no-backpressure", action="store_true", help="keep modeled stream ready high"
     )
     minimize = subparsers.add_parser(
@@ -153,6 +184,30 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the TensorWright command-line interface."""
     arguments = build_parser().parse_args(argv)
+    if arguments.command == "compile":
+        try:
+            labels = (
+                Path(arguments.labels).read_text(encoding="utf-8").splitlines()
+                if arguments.labels
+                else None
+            )
+            bundle_path = compile_onnx_bundle(
+                arguments.model,
+                arguments.calibration,
+                arguments.output,
+                labels=labels,
+            )
+        except (CompilerError, OSError, ValueError) as error:
+            print(f"tensorwright: compilation failed: {error}", file=sys.stderr)
+            return 1
+        print(f"Compiled TensorWright bundle: {bundle_path}")
+        return 0
+    if arguments.command == "inspect-bundle":
+        try:
+            print(inspect_bundle_json(arguments.bundle), end="")
+        except (CompilerError, OSError, ValueError) as error:
+            print(f"tensorwright: bundle inspection failed: {error}", file=sys.stderr)
+            return 1
     if arguments.command == "simulate":
         try:
             simulation_result = simulate_bundle(
@@ -168,6 +223,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print(simulation_result.to_json(), end="")
         return 0 if simulation_result.reference_match else 2
+    if arguments.command == "benchmark":
+        try:
+            print(
+                benchmark_bundle_json(
+                    arguments.bundle,
+                    runs=arguments.runs,
+                    seed=arguments.seed,
+                    randomized_backpressure=not arguments.no_backpressure,
+                ),
+                end="",
+            )
+        except (CompilerError, SimulationError, OSError, ValueError) as error:
+            print(f"tensorwright: benchmark failed: {error}", file=sys.stderr)
+            return 1
+        return 0
     if arguments.command == "minimize":
         try:
             input_path = Path(arguments.input)

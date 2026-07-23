@@ -84,19 +84,21 @@ module tb_convolution_engine;
                 @(negedge clk); lfsr = {lfsr[30:0], lfsr[31]^lfsr[21]^lfsr[1]^lfsr[0]};
                 output_ready = lfsr[4] | lfsr[7]; #1; sink_fire = output_valid && output_ready;
                 if ((arithmetic_trace_file != 0) && (case_index == 0) &&
-                    dut.arithmetic_core.postprocess.valid_i) begin
+                    dut.arithmetic_core.postprocess.rounded_valid_q) begin
                     logical_sequence = int'(dut.output_channel) * 9 +
                         int'(dut.output_y) * 3 + int'(dut.output_x);
                     $fdisplay(arithmetic_trace_file,
                         "%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d",
                         logical_sequence, simulation_cycle,
-                        $signed(dut.arithmetic_core.postprocess.accumulator_i),
-                        $signed(dut.arithmetic_core.postprocess.bias_i),
-                        $signed(dut.arithmetic_core.postprocess.biased),
-                        $signed(dut.arithmetic_core.postprocess.multiplier_i),
-                        dut.arithmetic_core.postprocess.shift_i,
-                        $signed(dut.arithmetic_core.postprocess.product),
-                        $signed(dut.arithmetic_core.postprocess.rounded),
+                        $signed(dut.arithmetic_core.postprocess.trace_accumulator_q),
+                        $signed(dut.arithmetic_core.postprocess.trace_bias_q),
+                        $signed(dut.arithmetic_core.postprocess.trace_biased_q),
+                        $signed(dut.arithmetic_core.postprocess.trace_multiplier_q),
+                        dut.arithmetic_core.postprocess.trace_shift_q,
+                        $signed(dut.arithmetic_core.postprocess.product_q),
+                        $signed(dut.arithmetic_core.postprocess.rounded_negative_q ?
+                            -dut.arithmetic_core.postprocess.rounded_magnitude_q :
+                            dut.arithmetic_core.postprocess.rounded_magnitude_q),
                         $signed(dut.arithmetic_core.postprocess.next_result));
                 end
                 if (sink_fire) begin

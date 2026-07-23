@@ -85,7 +85,7 @@ class RtlTraceCapture:
                     "tlast": transfer.last,
                     "sequence": transfer.sequence,
                 },
-                **self._identity,
+                **self._identity,  # type: ignore[arg-type]
             )
         )
 

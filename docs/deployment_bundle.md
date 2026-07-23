@@ -20,12 +20,13 @@ model_name.twmodel/
 ```
 
 The bundle is a directory, not a single archive. It is the runtime-neutral boundary
-between compilation and both simulated and future board execution. `manifest.json`
-will identify the format version, model, target, required hardware-interface version,
+between compilation, RTL simulation, and future board execution. `manifest.json`
+identifies the format version, model, target, required hardware-interface version,
 command-format version, tensor interfaces, layer count, and scratch-memory requirement.
 
-The simulation runtime must consume `commands.bin` and packed tensor files rather than
-reconstructing work from model-specific testbench knowledge. A future ARM runtime must
+The simulation runtime consumes `commands.bin` and packed tensor files rather than
+reconstructing work from model-specific testbench knowledge. The fixed-shape Verilator
+runner also decodes FPGA convolution data directly from the bundle. A future ARM runtime must
 accept the same validated content. Simulator seeds, logs, waveforms, and synthesis
 reports are run artifacts and do not alter bundle semantics.
 
@@ -65,3 +66,6 @@ Reference inputs are stored as little-endian FP32 values in graph-input order so
 runtime can reproduce input quantization. Reference outputs use FP32 for floating CPU
 outputs and signed INT8 for quantized outputs. `labels.txt` is UTF-8 with one label per
 line and may be empty.
+
+`make demo-bundle-rtl` compiles a fresh ONNX convolution, validates its bundle, decodes
+the binary records, runs the native RTL, and requires all 18 output values to match.

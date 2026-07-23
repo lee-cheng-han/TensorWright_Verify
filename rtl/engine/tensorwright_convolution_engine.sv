@@ -17,17 +17,17 @@ module tensorwright_convolution_engine #(
     localparam int OUTPUT_X_WIDTH = (OUTPUT_WIDTH <= 1) ? 1 : $clog2(OUTPUT_WIDTH),
     localparam int OUTPUT_Y_WIDTH = (OUTPUT_HEIGHT <= 1) ? 1 : $clog2(OUTPUT_HEIGHT)
 ) (
-    input logic clk_i, input logic rst_ni, input logic start_i, input logic soft_reset_i,
-    input logic weight_tvalid_i, output logic weight_tready_o,
-    input logic signed [7:0] weight_tdata_i, input logic weight_tlast_i,
-    input logic activation_tvalid_i, output logic activation_tready_o,
-    input logic signed [7:0] activation_tdata_i, input logic activation_tlast_i,
-    output logic output_tvalid_o, input logic output_tready_i,
+    input wire logic clk_i, input wire logic rst_ni, input wire logic start_i, input wire logic soft_reset_i,
+    input wire logic weight_tvalid_i, output logic weight_tready_o,
+    input wire logic signed [7:0] weight_tdata_i, input wire logic weight_tlast_i,
+    input wire logic activation_tvalid_i, output logic activation_tready_o,
+    input wire logic signed [7:0] activation_tdata_i, input wire logic activation_tlast_i,
+    output logic output_tvalid_o, input wire logic output_tready_i,
     output logic signed [7:0] output_tdata_o, output logic output_tlast_o,
-    input logic signed [OUTPUT_CHANNELS-1:0][31:0] biases_i,
-    input logic [OUTPUT_CHANNELS-1:0][30:0] multipliers_i,
-    input logic [OUTPUT_CHANNELS-1:0][6:0] shifts_i,
-    input logic [OUTPUT_CHANNELS-1:0] relu_i,
+    input wire logic signed [OUTPUT_CHANNELS-1:0][31:0] biases_i,
+    input wire logic [OUTPUT_CHANNELS-1:0][30:0] multipliers_i,
+    input wire logic [OUTPUT_CHANNELS-1:0][6:0] shifts_i,
+    input wire logic [OUTPUT_CHANNELS-1:0] relu_i,
     output logic busy_o, output logic done_o, output logic overflow_o,
     output logic compute_active_o, output logic [31:0] macs_executed_o
 );

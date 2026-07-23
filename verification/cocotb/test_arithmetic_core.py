@@ -59,6 +59,10 @@ async def arithmetic_core_matches_accumulated_dot_products(dut) -> None:  # type
             await RisingEdge(dut.clk_i)
             await Timer(1, unit="ns")
 
+        dut.valid_i.value = 0
+        while not int(dut.valid_o.value):
+            await RisingEdge(dut.clk_i)
+            await Timer(1, unit="ns")
         assert int(dut.valid_o.value) == 1
         assert int(dut.overflow_o.value) == 0
         actual = int(dut.result_o.value)

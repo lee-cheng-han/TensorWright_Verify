@@ -5,8 +5,8 @@ interface tensorwright_axil_if #(
     parameter int ADDRESS_WIDTH = 12,
     parameter int DATA_WIDTH = 32
 ) (
-    input logic clk_i,
-    input logic rst_ni
+    input wire logic clk_i,
+    input wire logic rst_ni
 );
     logic [ADDRESS_WIDTH-1:0] awaddr;
     logic awvalid, awready;
