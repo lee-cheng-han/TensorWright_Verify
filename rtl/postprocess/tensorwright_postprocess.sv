@@ -61,14 +61,21 @@ module tensorwright_postprocess #(
         biased_ext = $signed(accumulator_i) + $signed(bias_i);
         biased = biased_ext[ACC_WIDTH-1:0];
         bias_overflow = biased_ext[ACC_WIDTH] != biased_ext[ACC_WIDTH-1];
-        product = $signed(biased_q) * $signed({1'b0, biased_multiplier_q});
+    end
 
+    always_comb begin
+        product = $signed(biased_q) * $signed({1'b0, biased_multiplier_q});
+    end
+
+    always_comb begin
         if (product_q < 0) begin
             magnitude = $unsigned(-product_q);
         end else begin
             magnitude = $unsigned(product_q);
         end
+    end
 
+    always_comb begin
         if (magnitude_shift_q == 0) begin
             rounded_magnitude = magnitude_q;
         end else if (magnitude_shift_q >= 64) begin
@@ -85,7 +92,9 @@ module tensorwright_postprocess #(
                 {{63{1'b0}}, magnitude_q[magnitude_shift_q[5:0] - 1'b1]};
 `endif
         end
+    end
 
+    always_comb begin
         if (rounded_overflow_q) begin
             next_result = '0;
         end else if (rounded_relu_q && rounded_negative_q) begin
