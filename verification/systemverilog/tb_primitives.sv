@@ -74,6 +74,7 @@ module tb_primitives;
         assert ($signed(tree_sum) == expected) else $fatal(1, "adder tree mismatch");
 
         repeat (2) @(posedge clk_i);
+        @(negedge clk_i);
         rst_ni = 1'b1;
         activation_i = 8'sd127;
         weight_i = 8'sd127;

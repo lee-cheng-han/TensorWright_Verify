@@ -42,6 +42,7 @@ module tb_arithmetic_core;
             $fatal(1, "could not open %s", vector_file);
         end
         repeat (2) @(posedge clk_i);
+        @(negedge clk_i);
         rst_ni = 1'b1;
 
         while (!$feof(vectors)) begin
@@ -58,6 +59,7 @@ module tb_arithmetic_core;
             if (status == 6) begin
                 relu_i = relu_value[0];
                 for (cycle = 0; cycle < cycle_count; cycle = cycle + 1) begin
+                    @(negedge clk_i);
                     for (lane = 0; lane < LANES; lane = lane + 1) begin
                         status = $fscanf(
                             vectors,

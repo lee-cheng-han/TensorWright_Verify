@@ -32,7 +32,11 @@ module tb_postprocess;
         if (vectors == 0) begin
             $fatal(1, "could not open %s", vector_file);
         end
+        // Drive reset and transaction inputs away from the DUT sampling edge.
+        // Changing them on a positive edge creates an event-ordering race whose
+        // outcome differs between Verilator releases.
         repeat (2) @(posedge clk_i);
+        @(negedge clk_i);
         rst_ni = 1'b1;
 
         while (!$feof(vectors)) begin
@@ -47,10 +51,11 @@ module tb_postprocess;
                 expected
             );
             if (status == 6) begin
+                @(negedge clk_i);
                 relu_i = relu_value[0];
                 valid_i = 1'b1;
                 @(posedge clk_i);
-                #1;
+                @(negedge clk_i);
                 valid_i = 1'b0;
                 while (!valid_o) begin
                     @(posedge clk_i);
