@@ -17,6 +17,10 @@ module tb_postprocess;
     integer status;
     integer expected;
     integer relu_value;
+    integer accumulator_value;
+    integer bias_value;
+    integer multiplier_value;
+    integer shift_value;
     integer count = 0;
     string vector_file;
 
@@ -43,15 +47,19 @@ module tb_postprocess;
             status = $fscanf(
                 vectors,
                 "%d %d %d %d %d %d\n",
-                accumulator_i,
-                bias_i,
-                multiplier_i,
-                shift_i,
+                accumulator_value,
+                bias_value,
+                multiplier_value,
+                shift_value,
                 relu_value,
                 expected
             );
             if (status == 6) begin
                 @(negedge clk_i);
+                accumulator_i = accumulator_value[31:0];
+                bias_i = bias_value[31:0];
+                multiplier_i = multiplier_value[30:0];
+                shift_i = shift_value[6:0];
                 relu_i = relu_value[0];
                 valid_i = 1'b1;
                 @(posedge clk_i);

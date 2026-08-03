@@ -22,6 +22,9 @@ module tb_arithmetic_core;
     integer cycle_count;
     integer expected;
     integer relu_value;
+    integer bias_value;
+    integer multiplier_value;
+    integer shift_value;
     integer activation_value;
     integer weight_value;
     integer vector_count = 0;
@@ -50,13 +53,16 @@ module tb_arithmetic_core;
                 vectors,
                 "%d %d %d %d %d %d\n",
                 cycle_count,
-                bias_i,
-                multiplier_i,
-                shift_i,
+                bias_value,
+                multiplier_value,
+                shift_value,
                 relu_value,
                 expected
             );
             if (status == 6) begin
+                bias_i = bias_value[31:0];
+                multiplier_i = multiplier_value[30:0];
+                shift_i = shift_value[6:0];
                 relu_i = relu_value[0];
                 for (cycle = 0; cycle < cycle_count; cycle = cycle + 1) begin
                     @(negedge clk_i);
